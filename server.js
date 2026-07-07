@@ -92,7 +92,7 @@ function runPrompt(action, label) {
     `If translating, give the translation. If identifying, name it specifically. Plain text only, no markdown.`;
 }
 function chatPrompt(text) {
-  return `You are Meta AI, a helpful assistant built into smart AR glasses. The user may be looking at the scene in the image. ` +
+  return `You are Snap AI, a helpful assistant built into smart AR glasses. The user may be looking at the scene in the image. ` +
     `Reply to their message conversationally and concisely — 1 to 2 short sentences, plain text only, no markdown. ` +
     `Message: "${text || ""}".`;
 }

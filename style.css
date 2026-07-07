@@ -56,13 +56,8 @@ body.hud-page { background: #000; color: #fff; height: 100vh; display: flex; ali
   border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 1cqw 2.8cqw 1cqw 1.8cqw;
   background: rgba(0,0,0,0.45);
 }
-/* Meta AI mark — conic-gradient ring */
-#mode-badge .meta-mark {
-  width: 4.2cqw; height: 4.2cqw; border-radius: 50%; flex: 0 0 auto;
-  background: conic-gradient(from 200deg, #4dd7e0, #5b7cff, #a35cff, #ff5fa8, #4dd7e0);
-  -webkit-mask: radial-gradient(circle, transparent 43%, #000 47%);
-          mask: radial-gradient(circle, transparent 43%, #000 47%);
-}
+/* Snap AI mark — ghost glyph */
+#mode-badge .snap-mark { width: 4.6cqw; height: 4.6cqw; flex: 0 0 auto; display: block; }
 /* icons in list rows + camera button (monochrome, inherit text color) */
 .opt-item .ic { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 .opt-item .ic svg { width: 5.6cqw; height: 5.6cqw; }
@@ -241,14 +236,14 @@ body.phone-page #conn.on { color: #81c995; }
 .hc-time { font-size: 60px; font-weight: 400; letter-spacing: -1px; line-height: 1; }
 .hc-date { font-size: 15px; font-weight: 500; margin-top: 8px; color: #e2e5ea; }
 /* Meta control — Material FAB */
-#float-icon {
+#float-icon {   /* Snapchat-style yellow control with the ghost */
   position: absolute; right: 22px; bottom: 96px; width: 62px; height: 62px; border-radius: 20px;
-  border: none; cursor: pointer; background: #2c3f5a;
+  border: none; cursor: pointer; background: #FFFC00;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 6px 16px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.4);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-#float-icon svg { width: 30px; height: 30px; color: #a8c7fa; }
+#float-icon svg { width: 36px; height: 36px; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.18)); }
 #float-icon:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(0,0,0,0.26); }
 #float-icon:active { transform: scale(0.96); }
 

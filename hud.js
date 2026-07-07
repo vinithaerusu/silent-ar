@@ -85,7 +85,7 @@ const FACTS = {
 renderKeyboard(hudKb);
 camBtn.innerHTML = ICONS.camera;
 chatCam.innerHTML = ICONS.camera;
-modeBadge.innerHTML = `<span class="meta-mark"></span><span>Meta AI</span>`;
+modeBadge.innerHTML = `<svg class="snap-mark" viewBox="0 0 24 24"><path fill="#FFFC00" d="M12 3c-2.9 0-5 2.1-5 5v6.4c0 .7.8 1.1 1.4.7l.8-.5c.3-.2.7-.2 1 0l1.1.7c.4.3.9.3 1.3 0l1.1-.7c.3-.2.7-.2 1 0l.8.5c.6.4 1.4 0 1.4-.7V8c0-2.9-2.1-5-5-5z"/><circle cx="10.2" cy="9.4" r="1" fill="#151619"/><circle cx="13.8" cy="9.4" r="1" fill="#151619"/></svg><span>Snap AI</span>`;
 if (feedToggle) feedToggle.addEventListener("click", toggleFeed);   // demo control: webcam <-> street feed
 
 let model = null, detections = [], tracked = [], nextTrackId = 1;
@@ -95,7 +95,7 @@ let stage = "browse";                 // browse | menu | keyboard | result
 let menuIdx = 0, qSub = "input";      // menu focus (menuIdx===currentActions.length -> query row)
 let currentActions = [], menuLoading = false, loadingMsg = "";
 let query = "", scale = 1;
-let inputMode = "neural";             // input modality proxy: "neural" | "bci"
+let inputMode = "bci";                // BCI is the HUD's only input modality (the phone is the other path)
 const SSVEP_FREQ = [7.5, 10, 12, 15]; // Hz for the flickering targets (stylized)
 let aim = null, dwell = 0, dwellId = null, tPrev = performance.now();   // BCI head-aim reticle + dwell-to-select
 let lock = { el: null, run: null, progress: 0 };                        // BCI SSVEP lock: number-key -> fill -> commit
@@ -544,9 +544,7 @@ function back() {
 }
 function zoom(dir) { scale = Math.min(2.4, Math.max(1, scale + dir * 0.25)); display.style.transform = `scale(${scale})`; }
 
-// ---- Neural Band gesture proxies (keyboard) — a second input path alongside the phone ----
-//   thumb swipe = arrows/WASD (nav) · index pinch = Enter/Space (select) · middle pinch = Esc (back)
-//   pinch+twist = Z/X (zoom) · open camera view = C · open Meta AI = M
+// ---- view helpers — driven by the phone controller (sync intents) and BCI selects ----
 function openCamera() { resetFocus(); show("browse"); }   // the camera view (shows whichever feed is active)
 function openMetaAI() {
   metaAI = true; chat = []; query = "";
@@ -561,7 +559,7 @@ function renderChat() {
     : "";
   chatDefaults.classList.toggle("hidden", !optCount);
   const onQuery = chatIdx >= optCount;
-  chatField.textContent = query || "Ask Meta AI…";
+  chatField.textContent = query || "Ask Snap AI…";
   chatField.classList.toggle("ph", !query);
   chatCam.classList.toggle("active", onQuery && chatSub === "camera");
   chatField.classList.toggle("active", onQuery && chatSub === "input");
@@ -623,45 +621,22 @@ function onKey(e) {
   if (e.key === "Escape") return back();                      // back to the previous page — any mode
   if (e.key === "?") return helpPanel.classList.toggle("hidden");   // controls cheat-sheet
   if (e.key === "v" || e.key === "V") return toggleFeed();   // switch the camera feed: webcam <-> street demo
-  if (e.key === "t" || e.key === "T") return tongueDown(e);   // tongue works in any mode (hold = toggle BCI)
-  if (inputMode === "bci") return bciKey(e);
-  switch (e.key) {                          // Neural Band proxies
-    case "ArrowUp": case "w":    return nav("up");
-    case "ArrowDown": case "s":  return nav("down");
-    case "ArrowLeft": case "a":  return nav("left");
-    case "ArrowRight": case "d": return nav("right");
-    case "Enter": case " ":      e.preventDefault(); return select();   // index-finger pinch
-    case "z": case "Z":          return zoom(1);                         // pinch + twist
-    case "x": case "X":          return zoom(-1);
-    case "c": case "C":          return openCamera();                    // open camera view
-    case "m": case "M":          return openMetaAI();                    // open Meta AI
-  }
+  if (e.key === "t" || e.key === "T") return tongueDown(e);   // tongue = BCI gesture (double-tap = back)
+  return bciKey(e);                                           // BCI is the HUD's only keyboard input path
 }
 
-// ---- BCI modality: SSVEP (flickering targets 1-4) + tongue (hold = Meta AI, double-tap = back) ----
-function setMode(m) {
-  inputMode = m;
-  if (stage === "menu") renderMenu();
-  else if (stage === "chat") renderChat();
-}
+// ---- BCI modality: SSVEP (flickering targets 1-4) + head-aim dwell + tongue (double-tap = back) ----
 function bciKey(e) {
   if (e.key >= "1" && e.key <= "9") return bciSelect(+e.key - 1);   // SSVEP proxy
   if (e.key === "z" || e.key === "Z") return zoom(1);
   if (e.key === "x" || e.key === "X") return zoom(-1);
 }
-let tongueTimer = null, lastTap = 0;
-function tongueDown(e) {
-  if (e.repeat || tongueTimer) return;
-  tongueTimer = setTimeout(() => { tongueTimer = null; tongueHold(); }, 500);   // prolonged press
-}
-function tongueHold() {
-  setMode(inputMode === "bci" ? "neural" : "bci");   // hold tongue = turn BCI mode on / off
-}
+let lastTap = 0;
+function tongueDown(e) { if (e.repeat) return; }   // tongue press — the double-tap (below) is the back gesture
 function onKeyUp(e) {
-  if ((e.key === "t" || e.key === "T") && tongueTimer) {
-    clearTimeout(tongueTimer); tongueTimer = null;                               // released early -> a tap
+  if (e.key === "t" || e.key === "T") {
     const now = performance.now();
-    if (now - lastTap < 350) { lastTap = 0; if (inputMode === "bci") back(); }   // double-tap -> back (BCI)
+    if (now - lastTap < 350) { lastTap = 0; back(); }   // double-tap tongue -> back
     else lastTap = now;
   }
 }
