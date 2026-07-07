@@ -3,21 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HUD — Ray-Ban Display</title>
+  <title>HUD — Snap Spectacles</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="hud-page">
+  <!-- Snap Spectacles: the whole lens IS the display. No separate in-lens panel
+       (as on Ray-Ban Display) — object boxes are drawn straight onto the world
+       across the full FOV, and UI floats as glass cards anchored in space. -->
+
+  <!-- location caption — demo annotation, sits above the lens (not in the AR view) -->
+  <div id="hud-topbar"><div id="world-label">glasses view — the real world</div></div>
+
   <div id="viewport">
     <video id="video" playsinline muted></video>
     <canvas id="worldcanvas"></canvas>
-    <div id="world-label">glasses view — the real world</div>
+    <canvas id="dcanvas"></canvas>            <!-- full-FOV AR overlay: object boxes + head-aim reticle -->
 
-    <!-- THE GLASSES DISPLAY — square panel, lower-right -->
-    <div id="display">
-      <canvas id="dcanvas"></canvas>
-      <div id="mode-badge">Snap AI</div>
-      <div id="conn" class="off" title="phone connection">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2.5"/><line x1="10.5" y1="18" x2="13.5" y2="18"/></svg>
+    <!-- floating AR card — a hologram anchored in space in the lower-center of the FOV.
+         #panel sets the perspective; #panel-stage carries the 3D tilt + parallax float. -->
+    <div id="panel"><div id="panel-stage">
+      <!-- identity header — part of the floating panel (tilts + drifts with it) -->
+      <div id="hud-chrome">
+        <div id="conn" class="off" title="phone connection">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2.5"/><line x1="10.5" y1="18" x2="13.5" y2="18"/></svg>
+        </div>
+        <div id="mode-badge">Snap AI</div>
       </div>
 
       <div id="idle" class="disp-view">starting camera…</div>
@@ -43,7 +53,7 @@
       <!-- result view -->
       <div id="result" class="disp-view hidden"></div>
 
-      <!-- Meta AI assistant / chat view -->
+      <!-- Snap AI assistant / chat view -->
       <div id="chat" class="disp-view hidden">
         <div class="chat-thread"></div>
         <div class="chat-defaults"></div>
@@ -52,10 +62,14 @@
           <div id="chat-field" class="query-field">Ask Snap AI…</div>
         </div>
       </div>
-    </div>
+    </div></div>
+  </div>
 
-    <button id="feed-toggle" title="Switch camera feed: live webcam ↔ street demo"></button>
+  <!-- Demo controls — NOT part of the AR view; they live below the lens -->
+  <div id="hud-controls">
     <button id="help-btn" title="Controls (?)">?</button>
+    <button id="feed-toggle" title="Switch world feed: live webcam ↔ street demo"></button>
+    <span class="controls-note">demo controls — off-lens</span>
     <div id="help-panel" class="hidden">
       <div class="help-title">Controls</div>
       <div class="help-grid">
@@ -70,7 +84,7 @@
         <div class="help-h">Phone</div>
         <div class="help-rows"><span>NAVIGATE d-pad (swipe = move · tap = select) + Gboard keyboard</span></div>
         <div class="help-h">Street demo feed</div>
-        <div class="help-rows"><span>toggle bottom-left or <kbd>V</kbd> · drag to pan · same detection + actions</span></div>
+        <div class="help-rows"><span>toggle below the view or <kbd>V</kbd> · drag to pan · same detection + actions</span></div>
       </div>
     </div>
   </div>

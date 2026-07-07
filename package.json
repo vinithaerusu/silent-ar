@@ -1,7 +1,7 @@
 {
-  "name": "meta-glass-band-silent-ar-ai",
+  "name": "integrated-interactions-snap-glasses-silent-ar",
   "version": "1.0.0",
-  "description": "AI-driven silent AR object actions (Ray-Ban Display + Neural Band concept) — Gemini vision generates context-aware actions per object",
+  "description": "AI-driven silent AR object actions (Snap Spectacles full-FOV + BCI concept) — Gemini vision generates context-aware actions per object",
   "scripts": {
     "start": "node server.js"
   },

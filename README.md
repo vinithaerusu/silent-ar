@@ -1,38 +1,38 @@
-# Integrated Interactions — Meta Glasses (Silent AR)
+# Integrated Interactions — Snap Spectacles (Silent AR)
 
-A concept demo where a **Ray-Ban Display HUD** is driven by three input methods:
-the **Neural Band**, a **BCI** (Neurosity Crown), and the **phone as a touch
-controller**. The phone and the HUD are **separate screens that sync live**.
+A concept demo where a **Snap Spectacles full-FOV AR view** is driven by a
+**BCI** (Neurosity Crown) and the **phone as a touch controller**. The phone and
+the glasses are **separate screens that sync live**.
 
-## Slice 1 (current)
+Unlike Ray-Ban **Display** glasses, Spectacles have no separate in-lens panel —
+the whole lens *is* the display. So there's no corner window: **object boxes are
+drawn straight onto the world across the full field of view**, and Snap AI UI
+**floats as a glass card anchored in space**.
 
-The **phone control surface + Meta keyboard driving the HUD**:
+## Interface
 
-- **Phone** (`phone.html`) — a floating Meta control icon; tap it to open the
-  control surface: **ZOOM / SCROLL / BACK** buttons + the **Meta keyboard**.
-  - Keyboard: **touch-drag to hover** a key (blue highlight) → **release to
-    select**. Tap outside to close.
-  - **ZOOM** = vertical swipe on the button · **SCROLL** = horizontal swipe ·
-    **BACK** = tap.
-- **HUD** (`hud.html`) — the glasses view with a square display that mirrors the
-  phone: **keyboard preview**, **typed text**, the **blue key highlight**, and
-  reacts to zoom / scroll / back.
+- **Glasses** (`hud.html`) — the full-FOV lens view:
+  - **Browse** — look around the world; detected objects get a box + label drawn
+    right on them. **BCI head-aim reticle + dwell** picks an object.
+  - **Action card** — a floating glass card of AI context actions for the picked
+    object + a query row. **BCI = SSVEP flicker targets (1–4)**.
+  - **Snap AI** (assistant/chat) — the home card; **BCI back = tongue
+    double-tap**.
+- **Phone** (`phone.html`) — a floating Snap control; tap to open the control
+  surface: **NAVIGATE d-pad** (swipe = move · tap = select) + **Gboard keyboard**
+  (touch-drag to hover a key → release to select).
 
 Sync is over a `BroadcastChannel` (`sync.js`) — same origin, two tabs/windows.
 
 ## Run
 
 ```
-python3 -m http.server 8003
+node server.js        # serves the app + /api (Gemini vision) on http://localhost:8000
 ```
 
-Open `index.html` and launch both screens (or open `hud.html` and `phone.html`
-in two windows), place them side by side, and drive the HUD from the phone.
+Set `GEMINI_API_KEY` in `.env` for live vision actions; without it the card
+falls back to Search / Describe / Photo. Open `index.html` for the glasses +
+docked phone, or `hud.html` and `phone.html` in two windows side by side.
 
-## Later slices
-
-- Camera view (object detection) — opened via the camera button left of the
-  text input; Neural Band scroll-left+select; **BCI = SSVEP button**.
-- Meta AI (assistant/chat) — Neural Band hand gesture; **BCI = tongue prolonged
-  press**; **BCI back = tongue double-tap**.
-- Swipe-to-type (glide), scrollable content views.
+The world defaults to a pannable 360° **street demo** (drag to look around);
+toggle to the live webcam bottom-left or with **V**.

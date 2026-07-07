@@ -25,94 +25,141 @@ body.launcher {
 .launch-card .note { color: rgba(255,255,255,0.35); font-size: 12px; }
 
 /* ============================ HUD PAGE ============================ */
-body.hud-page { background: #000; color: #fff; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+/* Snap Spectacles UI language — frosted transparent glass, bright white hairlines
+   + white accents (matches the Lens Explorer look). Scoped to the glasses doc so
+   the phone keeps its Material blue. */
+body.hud-page {
+  background: #000; color: #fff; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; overflow: hidden;
+  --accent: #ffffff;                 /* carets / focus rings / reticle read white */
+  --rim: rgba(255,255,255,0.55);     /* bright glass hairline */
+  --glass: rgba(22,25,32,0.34);      /* see-through frosted fill */
+}
 #viewport {
   position: relative; width: min(96vw, 1180px); aspect-ratio: 16 / 9;
   background: #000; border-radius: 16px; overflow: hidden;
   box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+  /* type system — sized against the full FOV; Snap's Graphik if present else system sans */
+  font-family: "Graphik", "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
 }
-#video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.6); }
-#worldcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; filter: brightness(0.62); }
+/* the see-through world — Spectacles waveguides are additive, so keep the world bright */
+#video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.72); }
+#worldcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; filter: brightness(0.74); }
 #worldcanvas.on { display: block; }
-#world-label { position: absolute; left: 18px; top: 14px; z-index: 2; font-size: 12px; color: rgba(255,255,255,0.55); }
+/* location caption strip — above the lens, not part of the AR view */
+#hud-topbar { flex: 0 0 auto; width: min(96vw, 1180px); display: flex; align-items: center; }
+#world-label { font-size: 12px; letter-spacing: 0.02em; color: rgba(255,255,255,0.6); }
 
-/* the square glanceable display, lower-right */
-#display {
-  position: absolute; right: 6%; bottom: 12%;
-  width: min(30%, 340px); aspect-ratio: 1 / 1;
-  background: transparent; border-radius: 14px; overflow: hidden;   /* see-through panel — real world behind shows through */
-  container-type: inline-size;
-  /* type system — Meta's Optimistic if present, else the closest system sans */
-  font-family: "Optimistic Display", "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
-  --t-title: 6cqw; --t-lead: 5.2cqw; --t-body: 5cqw; --t-sub: 4.3cqw; --t-label: 3.3cqw;
-  box-shadow: 0 10px 34px rgba(0,0,0,0.5), 0 0 22px rgba(74,158,255,0.18);
-  transform-origin: bottom right; transition: transform 0.2s ease;
+/* full-FOV AR overlay — object boxes + reticle drawn straight onto the world */
+#dcanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+
+/* identity header — part of the floating panel, right-aligned above the card */
+#hud-chrome {
+  align-self: flex-end; margin-bottom: 3cqw; pointer-events: none;
+  display: flex; align-items: center; gap: 2.4cqw;
 }
-#dcanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 #mode-badge {
-  position: absolute; top: 3cqw; right: 3cqw; z-index: 4;
-  display: inline-flex; align-items: center; gap: 1.6cqw;
-  font-size: var(--t-label); letter-spacing: 0.01em; font-weight: 600; color: #f1f3f4;
-  border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 1cqw 2.8cqw 1cqw 1.8cqw;
-  background: rgba(0,0,0,0.45);
+  display: inline-flex; align-items: center; gap: 1.8cqw;
+  font-size: 3.6cqw; line-height: 1; letter-spacing: 0.01em; font-weight: 600; color: #f1f3f4;
+  box-shadow: inset 0 0 0 1px var(--rim); border-radius: 999px; padding: 1.4cqw 3.4cqw 1.4cqw 2.4cqw;
+  background: var(--glass); backdrop-filter: blur(22px) saturate(1.25); -webkit-backdrop-filter: blur(22px) saturate(1.25);
 }
-/* Snap AI mark — ghost glyph */
 #mode-badge .snap-mark { width: 4.6cqw; height: 4.6cqw; flex: 0 0 auto; display: block; }
+#hud-chrome > #conn {
+  position: static; display: flex; align-items: center; background: none; padding: 0; opacity: 1;
+}
+#hud-chrome > #conn svg { width: 4cqw; height: 4cqw; display: block; }
+#hud-chrome > #conn.off { color: rgba(255,255,255,0.3); }
+#hud-chrome > #conn.on { color: #34d17f; }
+
+/* floating AR card — a hologram anchored in space, lower-center of the FOV.
+   #panel establishes the perspective + sizing container; #panel-stage is the
+   plane that lives in 3D (tilt + slow parallax drift). */
+#panel {
+  position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%);
+  transform-origin: bottom center; transition: transform 0.2s ease;
+  width: min(44%, 480px); z-index: 3; pointer-events: none;
+  perspective: 1500px; perspective-origin: 50% 42%;   /* view the plane from just above → it recedes in depth */
+  container-type: inline-size;
+  --t-title: 6cqw; --t-lead: 5.2cqw; --t-body: 5cqw; --t-sub: 4.3cqw; --t-label: 3.3cqw;
+}
+#panel-stage {
+  display: flex; flex-direction: column; transform-style: preserve-3d;
+  transform-origin: 50% 60%; will-change: transform;
+  animation: ar-float 9s ease-in-out infinite;         /* untethered: gentle bob + sway in depth */
+}
+/* the plane sits angled in space, its top reclined slightly away, and drifts */
+@keyframes ar-float {
+  0%   { transform: rotateX(8deg) rotateY(-2.2deg) translate3d(0, 0, 0); }
+  50%  { transform: rotateX(6.4deg) rotateY(2.2deg) translate3d(0, -2.6%, 34px); }
+  100% { transform: rotateX(8deg) rotateY(-2.2deg) translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #panel-stage { animation: none; transform: rotateX(7deg); }   /* keep the depth, drop the motion */
+}
+.disp-view { display: flex; flex-direction: column; gap: 0; }
+.disp-view.hidden { display: none !important; }
+#idle {
+  align-self: center; align-items: center; text-align: center; color: #e3e6ea; font-size: var(--t-sub);
+  background: rgba(0,0,0,0.5); border-radius: 999px; padding: 3cqw 6cqw; backdrop-filter: blur(6px);
+}
+/* frosted transparent glass — bright white rim, world shows through.
+   Layered shadows read as depth (card floats above the scene) + a faint
+   holographic haze so it glows in space rather than sitting on the lens. */
+#menu, #kbview, #result, #chat {
+  background: var(--glass); color: #fff; border-radius: 6cqw; padding: 5cqw 4.5cqw;
+  box-shadow:
+    0 4cqw 9cqw rgba(0,0,0,0.5),          /* near, tight — grounds the plane */
+    0 12cqw 22cqw rgba(0,0,0,0.4),        /* far, soft — depth cast into space */
+    0 0 14cqw rgba(200,225,255,0.14),     /* cool holographic haze */
+    inset 0 0 0 1px var(--rim), inset 0 1px 0 rgba(255,255,255,0.4);
+  backdrop-filter: blur(22px) saturate(1.25);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+}
 /* icons in list rows + camera button (monochrome, inherit text color) */
 .opt-item .ic { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
 .opt-item .ic svg { width: 5.6cqw; height: 5.6cqw; }
 .cam-btn svg { width: 5cqw; height: 5cqw; }
-/* phone-connection status icon (top-left of the display) */
-#display #conn { position: absolute; top: 3.4cqw; left: 3.4cqw; z-index: 4; display: flex; align-items: center; background: none; padding: 0; }
-#display #conn svg { width: 4cqw; height: 4cqw; }
-#display #conn.off { color: rgba(255,255,255,0.3); }
-#display #conn.on { color: #34d17f; }
-.disp-view {
-  position: absolute; inset: 0; z-index: 2;
-  display: flex; flex-direction: column; justify-content: center; padding: 5cqw 4.5cqw;
-}
-#idle { align-items: center; text-align: center; color: #e3e6ea; font-size: var(--t-sub); background: rgba(0,0,0,0.45); }
-#menu, #kbview, #result, #chat { background: rgba(11,14,20,0.52); color: #fff; }   /* dark high-contrast surface, hints the world (waveguide) */
-#menu, #chat, #kbview { justify-content: flex-end; }   /* cards + keyboard sit at the bottom of the display */
 #kbview .kb-panel { border-radius: 4cqw; overflow: hidden; }   /* softer rounded keyboard on the HUD */
 #kbview .kb-suggest { height: 10cqw; }                          /* more room for auto-suggestions */
 
 /* Meta AI chat view — same look as the object action card (centered list + camera/input row) */
-#chat { padding: 4cqw 4.5cqw; }                       /* inherits centered alignment from .disp-view */
+#chat { padding: 4cqw 4.5cqw; }                       /* slightly tighter than the menu card */
 .chat-head { flex: 0 0 auto; font-size: 4.4cqw; font-weight: 600; color: var(--accent); margin-bottom: 2.5cqw; }
-.chat-thread { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 2cqw; }
+.chat-thread { flex: 1 1 auto; max-height: 54cqw; overflow-y: auto; display: flex; flex-direction: column; gap: 2cqw; }
 .chat-thread:empty { display: none; }                  /* empty home: collapse so the group centers like the menu */
 .msg { max-width: 86%; padding: 2.2cqw 3cqw; border-radius: 3cqw; font-size: var(--t-sub); font-weight: 400; line-height: 1.35; word-break: break-word; }
-.msg.user { align-self: flex-end; background: var(--accent); color: #fff; }
-.msg.ai { align-self: flex-start; background: rgba(255,255,255,0.15); color: #fff; }
+.msg.user { align-self: flex-end; background: rgba(255,255,255,0.92); color: #14171d; font-weight: 500; }
+.msg.ai { align-self: flex-start; background: rgba(255,255,255,0.14); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); }
 .chat-defaults { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2cqw; }   /* match #menu .opt-list */
 .chat-row { flex: 0 0 auto; display: flex; align-items: center; gap: 2.5cqw; margin-top: 3cqw; }   /* match .query-row */
 
 /* action card */
 #menu .opt-list { display: flex; flex-direction: column; gap: 2cqw; }
-.opt-item {
+.opt-item {                                              /* frosted glass pill */
   display: flex; align-items: center; gap: 3cqw; padding: 2.8cqw 4cqw;
-  border-radius: 3.6cqw; background: rgba(255,255,255,0.07); font-size: var(--t-body); font-weight: 500; color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);   /* hairline card edge on the transparent display */
+  border-radius: 999px; background: rgba(255,255,255,0.1); font-size: var(--t-body); font-weight: 500; color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);   /* bright hairline edge */
 }
-.opt-item.active {                                       /* spatial-focus highlight */
-  background: var(--accent); color: #fff;
-  box-shadow: 0 0 5cqw rgba(74,158,255,0.55), inset 0 0 0 1px rgba(255,255,255,0.28);
+.opt-item.active {                                       /* selected — bright white ring + glow (outline-forward, like the reference) */
+  background: rgba(255,255,255,0.16); color: #fff;
+  box-shadow: inset 0 0 0 1.6px rgba(255,255,255,0.92), 0 0 6cqw rgba(255,255,255,0.32);
 }
 #menu .query-row { display: flex; align-items: center; gap: 2.5cqw; margin-top: 3cqw; }
 .cam-btn {
   flex: 0 0 auto; width: 11cqw; height: 11cqw; border-radius: 50%; font-size: 5cqw;
   display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.14);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
 }
-.cam-btn.active { background: var(--accent); box-shadow: 0 0 5cqw rgba(74,158,255,0.55); }
+.cam-btn.active { background: rgba(255,255,255,0.22); box-shadow: inset 0 0 0 1.6px rgba(255,255,255,0.92), 0 0 5cqw rgba(255,255,255,0.32); }
 .query-field {
   flex: 1; min-width: 0; background: rgba(255,255,255,0.1); border-radius: 999px;
   padding: 3.4cqw 4.5cqw; font-size: var(--t-sub); color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.query-field.ph { color: rgba(255,255,255,0.45); }
-.query-field.active { box-shadow: inset 0 0 0 0.6cqw var(--accent), 0 0 4cqw rgba(74,158,255,0.45); }
-#result { text-align: center; font-size: var(--t-lead); font-weight: 500; line-height: 1.45; }
+.query-field.ph { color: rgba(255,255,255,0.55); }
+.query-field.active { box-shadow: inset 0 0 0 0.5cqw rgba(255,255,255,0.92), 0 0 4cqw rgba(255,255,255,0.3); }
+#result { text-align: center; font-size: var(--t-lead); font-weight: 500; line-height: 1.45; max-height: 62cqw; overflow-y: auto; }
 #result b { color: #fff; font-weight: 700; }
 
 #textline {
@@ -127,29 +174,32 @@ body.hud-page { background: #000; color: #fff; height: 100vh; display: flex; ali
   font-size: 11px; color: rgba(255,255,255,0.6); background: rgba(0,0,0,0.35);
   padding: 5px 12px; border-radius: 999px; backdrop-filter: blur(6px); white-space: nowrap;
 }
-/* controls help — small toggle button + cheat-sheet panel */
-#help-btn {
-  position: absolute; left: 16px; bottom: 14px; z-index: 5;
-  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
-  border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.4);
-  color: rgba(255,255,255,0.85); font: 600 15px system-ui; backdrop-filter: blur(4px);
+/* demo controls — a strip BELOW the lens (not part of the AR view) */
+#hud-controls {
+  position: relative; flex: 0 0 auto;
+  width: min(96vw, 1180px); display: flex; align-items: center; gap: 10px;
 }
-#help-btn:hover { background: rgba(0,0,0,0.6); color: #fff; }
+.controls-note { font-size: 11px; letter-spacing: 0.04em; color: rgba(255,255,255,0.35); }
+#help-btn {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.85); font: 600 15px system-ui;
+}
+#help-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
 #feed-toggle {
-  position: absolute; left: 56px; bottom: 14px; z-index: 5;
-  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px 0 10px;
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px 0 10px;
   border-radius: 15px; cursor: pointer; border: 1px solid rgba(255,255,255,0.25);
-  background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.9);
-  font: 600 12px system-ui; letter-spacing: 0.2px; backdrop-filter: blur(4px);
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9);
+  font: 600 12px system-ui; letter-spacing: 0.2px;
 }
 #feed-toggle .ic { width: 15px; height: 15px; display: inline-flex; }
 #feed-toggle .ic svg { width: 100%; height: 100%; }
-#feed-toggle:hover { background: rgba(0,0,0,0.6); color: #fff; }
-#feed-toggle.on { border-color: #4a9eff; color: #cfe4ff; background: rgba(20,40,70,0.5); }
+#feed-toggle:hover { background: rgba(255,255,255,0.12); color: #fff; }
+#feed-toggle.on { border-color: rgba(255,255,255,0.6); color: #fff; background: rgba(255,255,255,0.16); }
 #help-panel {
-  position: absolute; left: 16px; bottom: 54px; z-index: 5; max-width: 360px;
-  background: rgba(18,20,26,0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
-  padding: 14px 16px; color: #e8eaed; backdrop-filter: blur(10px); box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 5; max-width: 360px;
+  background: rgba(18,20,26,0.96); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
+  padding: 14px 16px; color: #e8eaed; backdrop-filter: blur(10px); box-shadow: 0 12px 40px rgba(0,0,0,0.6);
 }
 .help-title { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 11px; color: #fff; }
 .help-grid { display: flex; flex-direction: column; gap: 9px; }
@@ -173,7 +223,7 @@ kbd {
   content: attr(data-ssvep);
   position: absolute; top: 50%; right: 2.5cqw; transform: translateY(-50%);
   width: 4.6cqw; height: 4.6cqw; border-radius: 50%;
-  background: var(--accent); color: #fff; font-size: 3cqw; font-weight: 700;
+  background: rgba(255,255,255,0.95); color: #14171d; font-size: 3cqw; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
 .cam-btn.ssvep::after { top: -0.5cqw; right: -0.5cqw; transform: none; }   /* badge outside the round camera button */
@@ -182,7 +232,7 @@ kbd {
 .ssvep-lock { position: relative; }
 .ssvep-lock::before {
   content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--fill, 0%);
-  background: rgba(74, 158, 255, 0.6); border-radius: inherit; pointer-events: none; z-index: 2;
+  background: rgba(255,255,255,0.42); border-radius: inherit; pointer-events: none; z-index: 2;
 }
 
 /* ============================ PHONE PAGE ============================ */

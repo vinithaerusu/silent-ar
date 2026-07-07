@@ -1,5 +1,8 @@
 /*
- * HUD (Ray-Ban Display) — camera view + AI action card, driven by the phone.
+ * HUD (Snap Spectacles) — full-FOV spatial AR, driven by the phone.
+ * Unlike Ray-Ban Display, Spectacles have no separate in-lens panel: the whole
+ * lens is the display, so object boxes are drawn straight onto the world across
+ * the full field of view, and UI floats as a glass card anchored in space.
  * Interaction model ported from meta-glass-band-silent-ar-ai:
  *   browse (detect + focus) -> menu (AI context actions + query row) -> result
  * The phone sends generic intents (nav/select/back/zoom) + query text; the HUD
@@ -25,7 +28,7 @@ const caret      = document.getElementById("caret");
 const hudKb      = document.getElementById("hud-kb");
 const hudSuggest = document.getElementById("hud-suggest");
 const resultEl   = document.getElementById("result");
-const display    = document.getElementById("display");
+const panel      = document.getElementById("panel");
 const chatEl       = document.getElementById("chat");
 const chatThread   = chatEl.querySelector(".chat-thread");
 const chatDefaults = chatEl.querySelector(".chat-defaults");
@@ -134,7 +137,7 @@ async function detectLoop() {
 // ---- geometry ----
 function coverT() {
   const vw = feedW(), vh = feedH(), cw = dcanvas.width, ch = dcanvas.height;
-  const s = Math.max(cw / vw, ch / vh);   // cover: fill the display (crops the overflow)
+  const s = Math.max(cw / vw, ch / vh);   // cover: map the detection frame onto the full-FOV overlay
   return { s, ox: (cw - vw * s) / 2, oy: (ch - vh * s) / 2, vw, vh };
 }
 // ---- CV: temporal tracker — stable, EMA-smoothed, debounced boxes (from the band repo) ----
@@ -260,7 +263,7 @@ function loop(now) {
       if (stage === "browse") dwellTick(dt, foc);         // object: aim + dwell
       else if (stage === "menu" || stage === "chat") tickLock(dt);   // menu: number-key SSVEP fill
     }
-    draw(foc);                          // display panel: the camera view (either feed) or transparent for HUD views
+    draw(foc);                          // full-FOV overlay: object boxes + reticle in browse, clear otherwise
   } catch (e) { console.error("HUD loop error:", e && e.stack || e); }
   requestAnimationFrame(loop);                            // ALWAYS reschedule
 }
@@ -289,46 +292,46 @@ function renderLockFill() {
 }
 function draw(foc) {
   dctx.clearRect(0, 0, dcanvas.width, dcanvas.height);
-  // camera feed renders ONLY on the camera view; elsewhere the panel is transparent
-  // so the real world (the ambient view behind) shows through the translucent cards.
+  // Spectacles: no viewfinder. Boxes + reticle are drawn straight onto the world
+  // across the full FOV; when a card is up (menu/chat/…) the overlay stays clear.
   if (stage !== "browse" || !feedReady()) return;
-  const t = coverT();
-  dctx.fillStyle = "#0b0d11";                                   // clean viewfinder backdrop behind the fitted frame
-  dctx.fillRect(0, 0, dcanvas.width, dcanvas.height);
-  dctx.drawImage(feedEl(), t.ox, t.oy, t.vw * t.s, t.vh * t.s);
+  const t = coverT();                                          // map the detection frame onto the full FOV
   const bci = inputMode === "bci";
   detections.forEach((d, i) => {
     const [x, y, w, h] = d.bbox;
     const bx = x * t.s + t.ox, by = y * t.s + t.oy, bw = w * t.s, bh = h * t.s;
     const on = d === foc;
-    if (bci) {                                            // SSVEP: flickering translucent fill (box stays solid)
+    if (bci) {                                            // SSVEP: flickering translucent white fill (box stays solid)
       const f = SSVEP_FREQ[i % 4];
-      dctx.globalAlpha = 0.14 + 0.16 * (0.5 + 0.5 * Math.sin(2 * Math.PI * f * performance.now() / 1000));
-      dctx.fillStyle = "#4a9eff"; roundRect(bx, by, bw, bh, 6); dctx.fill();
+      dctx.globalAlpha = 0.12 + 0.14 * (0.5 + 0.5 * Math.sin(2 * Math.PI * f * performance.now() / 1000));
+      dctx.fillStyle = "#ffffff"; roundRect(bx, by, bw, bh, 6); dctx.fill();
       dctx.globalAlpha = 1;
     }
-    roundRect(bx, by, bw, bh, 6);                          // solid, always-visible outline
+    roundRect(bx, by, bw, bh, 6);                          // solid, always-visible outline — white, glows when focused
     dctx.lineWidth = on ? 3 : 2;
-    dctx.strokeStyle = on ? "#4a9eff" : "rgba(255,255,255,0.85)";
+    dctx.strokeStyle = on ? "#ffffff" : "rgba(255,255,255,0.85)";
+    dctx.shadowColor = on ? "rgba(255,255,255,0.9)" : "transparent";
+    dctx.shadowBlur = on ? 14 : 0;
     dctx.stroke();
-    if (bci && dwell > 0 && dwellId === d.id) {           // SSVEP dwell loader — same fill as the menus
+    dctx.shadowBlur = 0; dctx.shadowColor = "transparent";
+    if (bci && dwell > 0 && dwellId === d.id) {           // dwell loader — translucent white fill
       dctx.save(); roundRect(bx, by, bw, bh, 6); dctx.clip();
-      dctx.fillStyle = "rgba(74, 158, 255, 0.55)";
+      dctx.fillStyle = "rgba(255,255,255,0.5)";
       dctx.fillRect(bx, by, bw * dwell, bh);
       dctx.restore();
     }
-    if (on) {                                             // focused object label
-      dctx.font = "600 13px -apple-system, sans-serif";
+    if (on) {                                             // focused object label — white chip, dark text
+      dctx.font = "600 15px -apple-system, sans-serif";
       const tw = dctx.measureText(d.class).width;
-      dctx.fillStyle = "#4a9eff"; dctx.fillRect(bx, Math.max(0, by - 18), tw + 12, 18);
-      dctx.fillStyle = "#fff"; dctx.fillText(d.class, bx + 6, Math.max(12, by - 5));
+      dctx.fillStyle = "rgba(255,255,255,0.95)"; dctx.fillRect(bx, Math.max(0, by - 21), tw + 14, 21);
+      dctx.fillStyle = "#14171d"; dctx.fillText(d.class, bx + 7, Math.max(15, by - 6));
     }
   });
-  if (bci) {                                              // head-aim reticle (fill loader is drawn on the object)
+  if (bci) {                                              // head-aim reticle — white
     const p = aim || { x: dcanvas.width / 2, y: dcanvas.height / 2 };
-    dctx.strokeStyle = "#4a9eff"; dctx.lineWidth = 2;
+    dctx.strokeStyle = "#ffffff"; dctx.lineWidth = 2;
     dctx.beginPath(); dctx.arc(p.x, p.y, 9, 0, 2 * Math.PI); dctx.stroke();
-    dctx.fillStyle = "#4a9eff"; dctx.beginPath(); dctx.arc(p.x, p.y, 2.5, 0, 2 * Math.PI); dctx.fill();
+    dctx.fillStyle = "#ffffff"; dctx.beginPath(); dctx.arc(p.x, p.y, 2.5, 0, 2 * Math.PI); dctx.fill();
   }
 }
 function roundRect(x, y, w, h, r) {
@@ -343,13 +346,12 @@ function roundRect(x, y, w, h, r) {
 // works identically on either source. The street is a true 360° equirectangular pano you can pan (drag).
 const streetImg = new Image();
 let streetReady = false, feedSource = "street", panAngle = 180, panDrag = null;   // default feed: the street demo
-const streetFeed = document.createElement("canvas");   // the current street window, rendered as a camera-like frame
+const streetFeed = document.createElement("canvas");   // detection frame — samples the SAME window the FOV shows
 const sfctx = streetFeed.getContext("2d");
-streetFeed.width = 720; streetFeed.height = 720;
+streetFeed.width = 960; streetFeed.height = 540;        // 16:9, matches the viewport so boxes register to the world
 streetImg.onload = () => { streetReady = true; };
 streetImg.src = window.STREET_PANO || "";
-const ST_FOV = 76;          // street feed (camera) horizontal FOV — tighter = objects appear closer
-const ST_WORLD_FOV = 118;   // ambient glasses-view FOV — wider backdrop behind the panel
+const ST_WORLD_FOV = 118;   // the single Spectacles FOV — detection frame + visible world share it
 const ST_PITCH = 0.56;      // vertical center (fraction of image height): the horizon / street level
 function norm180(a) { return ((a + 180) % 360 + 360) % 360 - 180; }
 // the feed abstraction the camera pipeline runs on
@@ -365,10 +367,10 @@ function drawWrapped(ctx, img, sx, sy, sw, sh, dW, dH) {  // draw an (x-wrapping
   ctx.drawImage(img, sx, sy, w1, sh, 0, 0, dw1, dH);
   ctx.drawImage(img, 0, sy, sw - w1, sh, dw1, 0, dW - dw1, dH);
 }
-function renderStreetFeed() {            // render the current street window into the camera-frame canvas
+function renderStreetFeed() {            // render the FOV window into the detection frame (same rays as drawWorld)
   if (!streetReady) return;
   const iw = streetImg.naturalWidth, ih = streetImg.naturalHeight;
-  const sw = (ST_FOV / 360) * iw, sh = sw, sy = ST_PITCH * ih - sh / 2;   // square window (no distortion)
+  const sw = (ST_WORLD_FOV / 360) * iw, sh = sw * streetFeed.height / streetFeed.width, sy = ST_PITCH * ih - sh / 2;
   const sx = (panAngle / 360) * iw - sw / 2;
   sfctx.clearRect(0, 0, streetFeed.width, streetFeed.height);
   drawWrapped(sfctx, streetImg, sx, sy, sw, sh, streetFeed.width, streetFeed.height);
@@ -465,7 +467,7 @@ function renderMenu() {
   camBtn.classList.toggle("active", onQuery && qSub === "camera");
   queryField.classList.toggle("active", onQuery && qSub === "input");
   ssvepClear(menuEl);
-  if (inputMode === "bci") ssvepApply([...optList.querySelectorAll(".opt-item"), camBtn, queryField]);
+  if (inputMode === "bci") ssvepApply([...optList.querySelectorAll(".opt-item"), camBtn]);   // text input isn't an SSVEP target
 }
 function openKeyboard() { show("keyboard"); setText(query); renderSuggest(hudSuggest, []); }
 
@@ -542,7 +544,7 @@ function back() {
   else if (stage === "chat") { metaAI = false; resetFocus(); show("browse"); }   // Meta AI home -> camera view
   else if (stage === "browse") openMetaAI();   // camera view -> Meta AI home
 }
-function zoom(dir) { scale = Math.min(2.4, Math.max(1, scale + dir * 0.25)); display.style.transform = `scale(${scale})`; }
+function zoom(dir) { scale = Math.min(2.4, Math.max(1, scale + dir * 0.25)); panel.style.transform = `translateX(-50%) scale(${scale})`; }
 
 // ---- view helpers — driven by the phone controller (sync intents) and BCI selects ----
 function openCamera() { resetFocus(); show("browse"); }   // the camera view (shows whichever feed is active)
@@ -565,7 +567,7 @@ function renderChat() {
   chatField.classList.toggle("active", onQuery && chatSub === "input");
   chatThread.scrollTop = chatThread.scrollHeight;
   ssvepClear(chatEl);
-  if (inputMode === "bci") ssvepApply([...chatDefaults.querySelectorAll(".opt-item"), chatCam, chatField]);
+  if (inputMode === "bci") ssvepApply([...chatDefaults.querySelectorAll(".opt-item"), chatCam]);   // text input isn't an SSVEP target
 }
 function runDefault(d) {
   chat.push({ role: "user", text: d.label });
@@ -642,22 +644,20 @@ function onKeyUp(e) {
 }
 function bciSelect(n) {
   if (stage === "menu" && !menuLoading) {
-    const len = currentActions.length;                                           // targets: actions, camera, input
-    const items = [...optList.querySelectorAll(".opt-item"), camBtn, queryField];
+    const len = currentActions.length;                                           // SSVEP targets: actions, camera (text input is phone-only)
+    const items = [...optList.querySelectorAll(".opt-item"), camBtn];
     if (n >= items.length) return;
     startLock(items[n], () => {
       if (n < len) runAction(currentActions[n]);
-      else if (n === len) openCamera();
-      else openKeyboard();
+      else openCamera();                                                         // n === len -> camera
     });
   } else if (stage === "chat") {
-    const optCount = chat.length ? 0 : DEFAULTS.length;                          // targets: defaults, camera, input
-    const items = [...chatDefaults.querySelectorAll(".opt-item"), chatCam, chatField];
+    const optCount = chat.length ? 0 : DEFAULTS.length;                          // SSVEP targets: defaults, camera (text input is phone-only)
+    const items = [...chatDefaults.querySelectorAll(".opt-item"), chatCam];
     if (n >= items.length) return;
     startLock(items[n], () => {
       if (n < optCount) runDefault(DEFAULTS[n]);
-      else if (n === optCount) { metaAI = false; openCamera(); }
-      else openKeyboard();
+      else { metaAI = false; openCamera(); }                                     // n === optCount -> camera
     });
   }
 }
