@@ -11,8 +11,31 @@
        (as on Ray-Ban Display) — object boxes are drawn straight onto the world
        across the full FOV, and UI floats as glass cards anchored in space. -->
 
-  <!-- location caption — demo annotation, sits above the lens (not in the AR view) -->
-  <div id="hud-topbar"><div id="world-label">glasses view — the real world</div></div>
+  <!-- top bar — off-lens chrome pinned to the top: location caption + demo controls -->
+  <div id="hud-topbar">
+    <div id="hud-controls">
+      <button id="help-btn" title="Controls (?)">?</button>
+      <button id="feed-toggle" title="Switch world feed: live webcam ↔ street demo"></button>
+      <div id="help-panel" class="hidden">
+        <div class="help-title">Controls</div>
+        <div class="help-grid">
+          <div class="help-h">BCI</div>
+          <div class="help-rows">
+            <span><kbd>1</kbd>–<kbd>4</kbd> · SSVEP select</span>
+            <span>aim + hold · pick object (dwell)</span>
+            <span>double-tap <kbd>T</kbd> · back (tongue)</span>
+            <span><kbd>Z</kbd><kbd>X</kbd> · zoom</span>
+            <span><kbd>Esc</kbd> · back</span>
+          </div>
+          <div class="help-h">Phone</div>
+          <div class="help-rows"><span>NAVIGATE d-pad (swipe = move · tap = select) + Gboard keyboard</span></div>
+          <div class="help-h">Street demo feed</div>
+          <div class="help-rows"><span>toggle at the top or <kbd>V</kbd> · drag to pan · same detection + actions</span></div>
+        </div>
+      </div>
+    </div>
+    <div id="world-label">glasses view — the real world</div>
+  </div>
 
   <div id="viewport">
     <video id="video" playsinline muted></video>
@@ -63,30 +86,6 @@
         </div>
       </div>
     </div></div>
-  </div>
-
-  <!-- Demo controls — NOT part of the AR view; they live below the lens -->
-  <div id="hud-controls">
-    <button id="help-btn" title="Controls (?)">?</button>
-    <button id="feed-toggle" title="Switch world feed: live webcam ↔ street demo"></button>
-    <span class="controls-note">demo controls — off-lens</span>
-    <div id="help-panel" class="hidden">
-      <div class="help-title">Controls</div>
-      <div class="help-grid">
-        <div class="help-h">BCI</div>
-        <div class="help-rows">
-          <span><kbd>1</kbd>–<kbd>4</kbd> · SSVEP select</span>
-          <span>aim + hold · pick object (dwell)</span>
-          <span>double-tap <kbd>T</kbd> · back (tongue)</span>
-          <span><kbd>Z</kbd><kbd>X</kbd> · zoom</span>
-          <span><kbd>Esc</kbd> · back</span>
-        </div>
-        <div class="help-h">Phone</div>
-        <div class="help-rows"><span>NAVIGATE d-pad (swipe = move · tap = select) + Gboard keyboard</span></div>
-        <div class="help-h">Street demo feed</div>
-        <div class="help-rows"><span>toggle below the view or <kbd>V</kbd> · drag to pan · same detection + actions</span></div>
-      </div>
-    </div>
   </div>
 
   <script src="sync.js"></script>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phone controller — Meta glasses</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="phone-page">
+  <div id="device">
+  <div id="phone">
+    <div id="statusbar">
+      <span class="sb-time">9:41</span>
+      <span class="sb-icons">
+        <svg class="sbi" viewBox="0 0 16 12"><rect x="0" y="7" width="3" height="5"/><rect x="4.5" y="4.5" width="3" height="7.5"/><rect x="9" y="2" width="3" height="10"/><rect x="13" y="0" width="3" height="12"/></svg>
+        <svg class="sbi" viewBox="0 0 20 16"><path d="M10 15.5l9-11a14 14 0 00-18 0z"/></svg>
+        <svg class="sbi" viewBox="0 0 26 13"><rect x="1" y="1.5" width="20" height="10" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="22.5" y="4.5" width="2.5" height="4" rx="1"/><rect x="3.2" y="3.7" width="14" height="5.6" rx="1.6"/></svg>
+      </span>
+    </div>
+    <div id="conn" class="off">● HUD</div>
+
+    <div id="home-clock">
+      <div class="hc-time">9:41</div>
+      <div class="hc-date">Today</div>
+    </div>
+
+    <!-- home: floating Meta control (Material FAB) -->
+    <button id="float-icon" title="Open Meta keyboard"></button>
+
+    <!-- control surface as a Material bottom sheet -->
+    <div id="surface" class="hidden">
+      <button id="phone-help-btn" title="Controls">?</button>
+      <div id="phone-help" class="hidden">
+        <div class="ph-row"><b>NAVIGATE</b><span>swipe = move · center-tap = select</span></div>
+        <div class="ph-row"><b>ZOOM</b><span>swipe up / down</span></div>
+        <div class="ph-row"><b>BACK</b><span>tap</span></div>
+        <div class="ph-row"><b>Keyboard</b><span>tap = type · swipe = glide-type</span></div>
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-btn dpad" id="zoom-btn">
+          <svg class="chev up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
+          <span class="ctrl-lbl">ZOOM</span>
+          <svg class="chev down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="ctrl-btn dpad" id="scroll-btn">
+          <svg class="chev up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
+          <svg class="chev left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+          <span class="ctrl-lbl">NAVIGATE</span>
+          <svg class="chev right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+          <svg class="chev down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="ctrl-btn" id="back-btn">
+          <span class="ctrl-lbl">BACK</span>
+        </div>
+      </div>
+      <div id="phone-text" class="phone-text"></div>
+      <div class="kb-panel">
+        <div id="phone-suggest" class="kb-suggest"></div>
+        <div id="kb-wrap">
+          <div id="phone-kb" class="kb kb--live"></div>
+          <svg id="kb-trail"></svg>
+        </div>
+      </div>
+    </div>
+
+    <div id="navpill"></div>
+  </div>
+  </div>
+
+  <script src="sync.js"></script>
+  <script src="keyboard.js"></script>
+  <script src="words.js"></script>
+  <script src="phone.js"></script>
+</body>
+</html>

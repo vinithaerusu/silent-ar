@@ -33,6 +33,21 @@
     body.phone-open #phone-toggle { right: 448px; border-color: #4a9eff; background: rgba(20,40,70,0.85); }
     #phone-toggle:hover { background: rgba(30,34,42,0.92); }
     #phone-toggle svg { width: 17px; height: 17px; }
+
+    /* platform switch — segmented Snap / Meta control, top-center */
+    #platform-switch {
+      position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 30;
+      display: inline-flex; gap: 3px; padding: 3px; border-radius: 19px;
+      background: rgba(20,22,28,0.8); border: 1px solid rgba(255,255,255,0.14); backdrop-filter: blur(8px);
+    }
+    #platform-switch button {
+      border: none; cursor: pointer; padding: 6px 18px; border-radius: 16px; min-width: 62px;
+      background: transparent; color: rgba(255,255,255,0.7);
+      font: 600 12.5px -apple-system, system-ui; letter-spacing: 0.2px;
+      transition: background 0.15s, color 0.15s;
+    }
+    #platform-switch button.active { background: #fff; color: #14171d; }
+    #platform-switch button:not(.active):hover { color: #fff; }
   </style>
 </head>
 <body class="phone-open">
@@ -43,6 +58,11 @@
     <div id="phone-dock">
       <iframe class="frame" src="phone.html" title="Phone controller"></iframe>
     </div>
+  </div>
+
+  <div id="platform-switch" title="Switch platform build">
+    <button data-plat="snap" class="active">Snap</button>
+    <button data-plat="meta">Meta</button>
   </div>
 
   <button id="phone-toggle" title="Show / hide the phone controller">
@@ -62,10 +82,28 @@
     // Route keyboard focus to the HUD iframe so BCI number keys (SSVEP 1-4) work without a click.
     const hudWrap = document.getElementById("hud-wrap");
     const hudFrame = hudWrap.querySelector("iframe");
+    const phoneFrame = document.querySelector("#phone-dock iframe");
     const focusHud = () => { try { hudFrame.contentWindow.focus(); } catch (e) {} };
     hudFrame.addEventListener("load", focusHud);
     hudWrap.addEventListener("pointerenter", focusHud);
     window.addEventListener("load", () => setTimeout(focusHud, 60));
+
+    // Platform switch — swap both iframes between the Snap build (root) and the
+    // Meta Ray-Ban build (vendored under meta/). Both share the same /api + sync channel.
+    const PLATFORMS = {
+      snap: { hud: "hud.html",      phone: "phone.html" },
+      meta: { hud: "meta/hud.html", phone: "meta/phone.html" },
+    };
+    document.querySelectorAll("#platform-switch button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.classList.contains("active")) return;
+        const p = PLATFORMS[btn.dataset.plat];
+        document.querySelectorAll("#platform-switch button").forEach((b) => b.classList.toggle("active", b === btn));
+        hudFrame.src = p.hud;         // reloads the glasses view for the chosen platform
+        phoneFrame.src = p.phone;     // and its matching phone controller
+        setTimeout(focusHud, 120);
+      });
+    });
   </script>
 </body>
 </html>
