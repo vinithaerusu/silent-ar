@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HUD — Ray-Ban Display</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="hud-page">
+  <div id="viewport">
+    <video id="video" playsinline muted></video>
+    <canvas id="worldcanvas"></canvas>
+    <div id="world-label">glasses view — the real world</div>
+
+    <!-- THE GLASSES DISPLAY — square panel, lower-right -->
+    <div id="display">
+      <canvas id="dcanvas"></canvas>
+      <div id="mode-badge">✦ Meta AI</div>
+      <div id="conn" class="off" title="phone connection">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2.5"/><line x1="10.5" y1="18" x2="13.5" y2="18"/></svg>
+      </div>
+
+      <div id="idle" class="disp-view">starting camera…</div>
+
+      <!-- action card (menu) for the selected object -->
+      <div id="menu" class="disp-view hidden">
+        <div class="opt-list"></div>
+        <div class="query-row">
+          <div id="cam-btn" class="cam-btn">📷</div>
+          <div id="query-field" class="query-field"></div>
+        </div>
+      </div>
+
+      <!-- query keyboard view -->
+      <div id="kbview" class="disp-view hidden">
+        <div id="textline"><span id="caret"></span></div>
+        <div class="kb-panel">
+          <div id="hud-suggest" class="kb-suggest"></div>
+          <div id="hud-kb" class="kb"></div>
+        </div>
+      </div>
+
+      <!-- result view -->
+      <div id="result" class="disp-view hidden"></div>
+
+      <!-- Meta AI assistant / chat view -->
+      <div id="chat" class="disp-view hidden">
+        <div class="chat-thread"></div>
+        <div class="chat-defaults"></div>
+        <div class="chat-row">
+          <div id="chat-cam" class="cam-btn">📷</div>
+          <div id="chat-field" class="query-field">Ask Meta AI…</div>
+        </div>
+      </div>
+    </div>
+
+    <button id="feed-toggle" title="Switch camera feed: live webcam ↔ street demo"></button>
+    <button id="help-btn" title="Controls (?)">?</button>
+    <div id="help-panel" class="hidden">
+      <div class="help-title">Controls</div>
+      <div class="help-grid">
+        <div class="help-h">Neural Band</div>
+        <div class="help-rows">
+          <span><kbd>◄</kbd><kbd>►</kbd><kbd>▲</kbd><kbd>▼</kbd> move</span>
+          <span><kbd>⏎</kbd> select</span>
+          <span><kbd>Esc</kbd> back</span>
+          <span><kbd>Z</kbd><kbd>X</kbd> zoom</span>
+          <span><kbd>C</kbd> camera</span>
+          <span><kbd>M</kbd> Meta AI</span>
+          <span><kbd>V</kbd> switch feed (webcam / street)</span>
+        </div>
+        <div class="help-h">Street demo feed</div>
+        <div class="help-rows"><span>toggle bottom-left or <kbd>V</kbd> · drag to pan · same detection + actions</span></div>
+        <div class="help-h">BCI</div>
+        <div class="help-rows">
+          <span>hold <kbd>T</kbd> · BCI on/off</span>
+          <span>double-tap <kbd>T</kbd> · back</span>
+          <span><kbd>1</kbd>–<kbd>4</kbd> · SSVEP select</span>
+          <span>aim + hold · pick object</span>
+        </div>
+        <div class="help-h">Phone</div>
+        <div class="help-rows"><span>NAVIGATE d-pad + Gboard keyboard</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="sync.js"></script>
+  <script src="keyboard.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  <script src="street.js"></script>
+  <script src="hud.js"></script>
+</body>
+</html>

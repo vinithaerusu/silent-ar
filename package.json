@@ -1,0 +1,9 @@
+{
+  "name": "meta-glass-band-silent-ar-ai",
+  "version": "1.0.0",
+  "description": "AI-driven silent AR object actions (Ray-Ban Display + Neural Band concept) — Gemini vision generates context-aware actions per object",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}

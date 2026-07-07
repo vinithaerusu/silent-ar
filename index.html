@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Integrated Interactions — Meta Glasses (Silent AR)</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #08090b; overflow: hidden;
+      font-family: -apple-system, system-ui, sans-serif; }
+    #stage { display: flex; height: 100vh; width: 100vw; }
+    #hud-wrap { flex: 1; min-width: 0; position: relative; }
+    .frame { width: 100%; height: 100%; border: 0; display: block; background: #000; }
+
+    /* the phone docks on the right and slides open/closed */
+    #phone-dock {
+      width: 0; flex: 0 0 auto; overflow: hidden; background: #000;
+      border-left: 1px solid rgba(255,255,255,0.08);
+      transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    body.phone-open #phone-dock { width: 430px; }
+    #phone-dock .frame { width: 430px; }   /* fixed so it doesn't squish mid-slide */
+
+    /* toggle button — rides the seam between the HUD and the phone dock */
+    #phone-toggle {
+      position: fixed; top: 18px; right: 18px; z-index: 20;
+      display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px;
+      border-radius: 19px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(20,22,28,0.8); color: #eef1f6; backdrop-filter: blur(8px);
+      font: 600 13px -apple-system, system-ui; letter-spacing: 0.2px;
+      transition: right 0.28s cubic-bezier(0.4, 0, 0.2, 1), background 0.15s, border-color 0.15s;
+    }
+    body.phone-open #phone-toggle { right: 448px; border-color: #4a9eff; background: rgba(20,40,70,0.85); }
+    #phone-toggle:hover { background: rgba(30,34,42,0.92); }
+    #phone-toggle svg { width: 17px; height: 17px; }
+  </style>
+</head>
+<body class="phone-open">
+  <div id="stage">
+    <div id="hud-wrap">
+      <iframe class="frame" src="hud.html" title="Glasses view (HUD)" allow="camera"></iframe>
+    </div>
+    <div id="phone-dock">
+      <iframe class="frame" src="phone.html" title="Phone controller"></iframe>
+    </div>
+  </div>
+
+  <button id="phone-toggle" title="Show / hide the phone controller">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round">
+      <rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/>
+    </svg>
+    <span class="lbl">Hide phone</span>
+  </button>
+
+  <script>
+    const body = document.body, lbl = document.querySelector("#phone-toggle .lbl");
+    document.getElementById("phone-toggle").addEventListener("click", () => {
+      const open = body.classList.toggle("phone-open");
+      lbl.textContent = open ? "Hide phone" : "Phone";
+    });
+  </script>
+</body>
+</html>

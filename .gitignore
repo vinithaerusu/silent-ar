@@ -1,0 +1,11 @@
+# secrets — never commit the API key
+.env
+
+# macOS
+.DS_Store
+
+# logs / local artifacts
+*.log
+
+# captured demo photos
+spectra-*.jpg

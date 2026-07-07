@@ -1,0 +1,367 @@
+:root {
+  --accent: #4a9eff;
+  --meta: #2b2f36;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  -webkit-user-select: none; user-select: none;
+}
+
+/* ============================ LAUNCHER ============================ */
+body.launcher {
+  background: #0e1013; color: #fff; height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+}
+.launch-card { max-width: 460px; padding: 32px; text-align: center; }
+.launch-card h1 { font-size: 26px; margin-bottom: 10px; }
+.launch-card .sub { color: rgba(255,255,255,0.6); font-size: 14px; line-height: 1.5; margin-bottom: 14px; }
+.launch-btns { display: flex; flex-direction: column; gap: 12px; margin: 22px 0 14px; }
+.launch-btns button {
+  padding: 14px 18px; font-size: 15px; border-radius: 12px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.14); background: #1a1e24; color: #fff;
+}
+.launch-btns button:hover { background: #222831; border-color: var(--accent); }
+.launch-card .note { color: rgba(255,255,255,0.35); font-size: 12px; }
+
+/* ============================ HUD PAGE ============================ */
+body.hud-page { background: #000; color: #fff; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+#viewport {
+  position: relative; width: min(96vw, 1180px); aspect-ratio: 16 / 9;
+  background: #000; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6);
+}
+#video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: brightness(0.6); }
+#worldcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; filter: brightness(0.62); }
+#worldcanvas.on { display: block; }
+#world-label { position: absolute; left: 18px; top: 14px; z-index: 2; font-size: 12px; color: rgba(255,255,255,0.55); }
+
+/* the square glanceable display, lower-right */
+#display {
+  position: absolute; right: 6%; bottom: 12%;
+  width: min(30%, 340px); aspect-ratio: 1 / 1;
+  background: transparent; border-radius: 14px; overflow: hidden;   /* see-through panel — real world behind shows through */
+  container-type: inline-size;
+  /* type system — Meta's Optimistic if present, else the closest system sans */
+  font-family: "Optimistic Display", "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
+  --t-title: 6cqw; --t-lead: 5.2cqw; --t-body: 5cqw; --t-sub: 4.3cqw; --t-label: 3.3cqw;
+  box-shadow: 0 10px 34px rgba(0,0,0,0.5), 0 0 22px rgba(74,158,255,0.18);
+  transform-origin: bottom right; transition: transform 0.2s ease;
+}
+#dcanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#mode-badge {
+  position: absolute; top: 3cqw; right: 3cqw; z-index: 4;
+  display: inline-flex; align-items: center; gap: 1.6cqw;
+  font-size: var(--t-label); letter-spacing: 0.01em; font-weight: 600; color: #f1f3f4;
+  border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 1cqw 2.8cqw 1cqw 1.8cqw;
+  background: rgba(0,0,0,0.45);
+}
+/* Meta AI mark — conic-gradient ring */
+#mode-badge .meta-mark {
+  width: 4.2cqw; height: 4.2cqw; border-radius: 50%; flex: 0 0 auto;
+  background: conic-gradient(from 200deg, #4dd7e0, #5b7cff, #a35cff, #ff5fa8, #4dd7e0);
+  -webkit-mask: radial-gradient(circle, transparent 43%, #000 47%);
+          mask: radial-gradient(circle, transparent 43%, #000 47%);
+}
+/* icons in list rows + camera button (monochrome, inherit text color) */
+.opt-item .ic { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.opt-item .ic svg { width: 5.6cqw; height: 5.6cqw; }
+.cam-btn svg { width: 5cqw; height: 5cqw; }
+/* phone-connection status icon (top-left of the display) */
+#display #conn { position: absolute; top: 3.4cqw; left: 3.4cqw; z-index: 4; display: flex; align-items: center; background: none; padding: 0; }
+#display #conn svg { width: 4cqw; height: 4cqw; }
+#display #conn.off { color: rgba(255,255,255,0.3); }
+#display #conn.on { color: #34d17f; }
+.disp-view {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; justify-content: center; padding: 5cqw 4.5cqw;
+}
+#idle { align-items: center; text-align: center; color: #e3e6ea; font-size: var(--t-sub); background: rgba(0,0,0,0.45); }
+#menu, #kbview, #result, #chat { background: rgba(11,14,20,0.52); color: #fff; }   /* dark high-contrast surface, hints the world (waveguide) */
+#menu, #chat, #kbview { justify-content: flex-end; }   /* cards + keyboard sit at the bottom of the display */
+#kbview .kb-panel { border-radius: 4cqw; overflow: hidden; }   /* softer rounded keyboard on the HUD */
+#kbview .kb-suggest { height: 10cqw; }                          /* more room for auto-suggestions */
+
+/* Meta AI chat view — same look as the object action card (centered list + camera/input row) */
+#chat { padding: 4cqw 4.5cqw; }                       /* inherits centered alignment from .disp-view */
+.chat-head { flex: 0 0 auto; font-size: 4.4cqw; font-weight: 600; color: var(--accent); margin-bottom: 2.5cqw; }
+.chat-thread { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 2cqw; }
+.chat-thread:empty { display: none; }                  /* empty home: collapse so the group centers like the menu */
+.msg { max-width: 86%; padding: 2.2cqw 3cqw; border-radius: 3cqw; font-size: var(--t-sub); font-weight: 400; line-height: 1.35; word-break: break-word; }
+.msg.user { align-self: flex-end; background: var(--accent); color: #fff; }
+.msg.ai { align-self: flex-start; background: rgba(255,255,255,0.15); color: #fff; }
+.chat-defaults { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2cqw; }   /* match #menu .opt-list */
+.chat-row { flex: 0 0 auto; display: flex; align-items: center; gap: 2.5cqw; margin-top: 3cqw; }   /* match .query-row */
+
+/* action card */
+#menu .opt-list { display: flex; flex-direction: column; gap: 2cqw; }
+.opt-item {
+  display: flex; align-items: center; gap: 3cqw; padding: 2.8cqw 4cqw;
+  border-radius: 3.6cqw; background: rgba(255,255,255,0.07); font-size: var(--t-body); font-weight: 500; color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);   /* hairline card edge on the transparent display */
+}
+.opt-item.active {                                       /* spatial-focus highlight */
+  background: var(--accent); color: #fff;
+  box-shadow: 0 0 5cqw rgba(74,158,255,0.55), inset 0 0 0 1px rgba(255,255,255,0.28);
+}
+#menu .query-row { display: flex; align-items: center; gap: 2.5cqw; margin-top: 3cqw; }
+.cam-btn {
+  flex: 0 0 auto; width: 11cqw; height: 11cqw; border-radius: 50%; font-size: 5cqw;
+  display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.14);
+}
+.cam-btn.active { background: var(--accent); box-shadow: 0 0 5cqw rgba(74,158,255,0.55); }
+.query-field {
+  flex: 1; min-width: 0; background: rgba(255,255,255,0.1); border-radius: 999px;
+  padding: 3.4cqw 4.5cqw; font-size: var(--t-sub); color: #fff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.query-field.ph { color: rgba(255,255,255,0.45); }
+.query-field.active { box-shadow: inset 0 0 0 0.6cqw var(--accent), 0 0 4cqw rgba(74,158,255,0.45); }
+#result { text-align: center; font-size: var(--t-lead); font-weight: 500; line-height: 1.45; }
+#result b { color: #fff; font-weight: 700; }
+
+#textline {
+  min-height: 8cqw; font-size: var(--t-title); font-weight: 600; line-height: 1.3; margin-bottom: 3cqw;
+  border-bottom: 0.5cqw solid rgba(255,255,255,0.3); padding-bottom: 2cqw; word-break: break-word;
+  color: #fff;
+}
+#caret { display: inline-block; width: 0.5cqw; height: 6cqw; background: var(--accent); vertical-align: text-bottom; animation: blink 1s step-start infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+#disp-cap {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 3;
+  font-size: 11px; color: rgba(255,255,255,0.6); background: rgba(0,0,0,0.35);
+  padding: 5px 12px; border-radius: 999px; backdrop-filter: blur(6px); white-space: nowrap;
+}
+/* controls help — small toggle button + cheat-sheet panel */
+#help-btn {
+  position: absolute; left: 16px; bottom: 14px; z-index: 5;
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.4);
+  color: rgba(255,255,255,0.85); font: 600 15px system-ui; backdrop-filter: blur(4px);
+}
+#help-btn:hover { background: rgba(0,0,0,0.6); color: #fff; }
+#feed-toggle {
+  position: absolute; left: 56px; bottom: 14px; z-index: 5;
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px 0 10px;
+  border-radius: 15px; cursor: pointer; border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0,0,0,0.4); color: rgba(255,255,255,0.9);
+  font: 600 12px system-ui; letter-spacing: 0.2px; backdrop-filter: blur(4px);
+}
+#feed-toggle .ic { width: 15px; height: 15px; display: inline-flex; }
+#feed-toggle .ic svg { width: 100%; height: 100%; }
+#feed-toggle:hover { background: rgba(0,0,0,0.6); color: #fff; }
+#feed-toggle.on { border-color: #4a9eff; color: #cfe4ff; background: rgba(20,40,70,0.5); }
+#help-panel {
+  position: absolute; left: 16px; bottom: 54px; z-index: 5; max-width: 360px;
+  background: rgba(18,20,26,0.92); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
+  padding: 14px 16px; color: #e8eaed; backdrop-filter: blur(10px); box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.help-title { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 11px; color: #fff; }
+.help-grid { display: flex; flex-direction: column; gap: 9px; }
+.help-h { font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #8ab4f8; margin-top: 2px; }
+.help-rows { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: #cdd1d6; }
+.help-rows span { display: inline-flex; align-items: center; gap: 4px; }
+kbd {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 18px;
+  padding: 0 5px; border-radius: 5px; background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2); font: 600 11px system-ui; color: #fff;
+}
+
+/* BCI — SSVEP flickering targets + number badges */
+@keyframes ssvep-flick { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.ssvep { position: relative; }
+.ssvep1 { animation: ssvep-flick 0.14s linear infinite; }   /* ~7.5 Hz */
+.ssvep2 { animation: ssvep-flick 0.10s linear infinite; }   /* 10 Hz */
+.ssvep3 { animation: ssvep-flick 0.083s linear infinite; }  /* 12 Hz */
+.ssvep4 { animation: ssvep-flick 0.067s linear infinite; }  /* 15 Hz */
+.ssvep::after {
+  content: attr(data-ssvep);
+  position: absolute; top: 50%; right: 2.5cqw; transform: translateY(-50%);
+  width: 4.6cqw; height: 4.6cqw; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 3cqw; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.cam-btn.ssvep::after { top: -0.5cqw; right: -0.5cqw; transform: none; }   /* badge outside the round camera button */
+
+/* SSVEP lock — number-key starts a fill that builds then commits */
+.ssvep-lock { position: relative; }
+.ssvep-lock::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--fill, 0%);
+  background: rgba(74, 158, 255, 0.6); border-radius: inherit; pointer-events: none; z-index: 2;
+}
+
+/* ============================ PHONE PAGE ============================ */
+body.phone-page { background: #08090b; height: 100vh; display: flex; align-items: center; justify-content: center; }
+/* realistic metal frame — diagonal light reflection down the rails */
+#device {
+  padding: 5px; border-radius: 51px;
+  background:
+    linear-gradient(140deg, #4a4d53 0%, #1b1c20 24%, #0d0e10 50%, #1b1c20 76%, #4a4d53 100%);
+  box-shadow: 0 32px 84px rgba(0,0,0,0.78), inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+#phone {
+  position: relative; aspect-ratio: 9 / 20; height: min(92vh, 838px); width: auto; max-width: 92vw;
+  border-radius: 46px; overflow: hidden;
+  background:
+    radial-gradient(70% 45% at 16% 10%, rgba(129,97,230,0.38) 0%, transparent 52%),
+    radial-gradient(65% 45% at 90% 20%, rgba(56,138,240,0.34) 0%, transparent 50%),
+    radial-gradient(80% 55% at 82% 86%, rgba(38,182,150,0.30) 0%, transparent 52%),
+    radial-gradient(60% 45% at 22% 74%, rgba(224,92,158,0.24) 0%, transparent 52%),
+    linear-gradient(160deg, #14121a, #0d0e12);
+  box-shadow: inset 0 0 0 3px #08090b, inset 0 0 2px 4px rgba(255,255,255,0.04);  /* thin black screen bezel + glass edge */
+  color: #e8eaed; font-family: "Google Sans", "Roboto", system-ui, sans-serif;
+}
+/* punch-hole front camera */
+#phone::before {
+  content: ""; position: absolute; top: 11px; left: 50%; transform: translateX(-50%); z-index: 10;
+  width: 11px; height: 11px; border-radius: 50%; background: #050506;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+}
+/* status bar */
+#statusbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 34px; z-index: 8;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 22px; pointer-events: none;
+}
+.sb-time { font-size: 14px; font-weight: 600; letter-spacing: 0.2px; }
+.sb-icons { display: flex; align-items: center; gap: 6px; }
+.sbi { height: 13px; fill: #e8eaed; }
+/* connection chip */
+body.phone-page #conn {
+  position: absolute; top: 42px; left: 50%; transform: translateX(-50%); z-index: 7;
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+  font-size: 11px; font-weight: 600; padding: 5px 12px; border-radius: 999px;
+  background: rgba(255,255,255,0.1); color: #9aa0a6; backdrop-filter: blur(4px);
+}
+body.phone-page #conn.on { color: #81c995; }
+/* home "At a Glance" clock */
+#home-clock {
+  position: absolute; top: 13%; left: 0; right: 0; z-index: 3; text-align: center; pointer-events: none;
+  color: #f1f3f4; text-shadow: 0 2px 14px rgba(0,0,0,0.35);
+}
+.hc-time { font-size: 60px; font-weight: 400; letter-spacing: -1px; line-height: 1; }
+.hc-date { font-size: 15px; font-weight: 500; margin-top: 8px; color: #e2e5ea; }
+/* Meta control — Material FAB */
+#float-icon {
+  position: absolute; right: 22px; bottom: 96px; width: 62px; height: 62px; border-radius: 20px;
+  border: none; cursor: pointer; background: #2c3f5a;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.4);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+#float-icon svg { width: 30px; height: 30px; color: #a8c7fa; }
+#float-icon:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(0,0,0,0.26); }
+#float-icon:active { transform: scale(0.96); }
+
+/* control surface — Material bottom sheet */
+#surface {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 6;
+  display: flex; flex-direction: column;
+  background: #1e1f22; border-radius: 26px 26px 0 0;
+  box-shadow: 0 -10px 34px rgba(0,0,0,0.5); padding: 8px 0 20px;
+}
+.ctrl-row { display: flex; gap: 10px; padding: 4px 12px 8px; }
+.ctrl-btn {
+  position: relative;   /* chevrons are pinned to the edges so the label sits at true center */
+  flex: 1; background: #2d2f34; color: #dfe3e8; border-radius: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px 4px; min-height: 46px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  touch-action: none; user-select: none; transition: background 0.12s ease, transform 0.1s ease;
+}
+.ctrl-btn:hover { background: #35373c; }
+.ctrl-btn:active, .ctrl-btn.flash { background: var(--accent); color: #fff; transform: scale(0.97); }
+.ctrl-lbl { font-size: 11.5px; font-weight: 600; letter-spacing: 0.09em; text-align: center; }
+.chev { width: 15px; height: 15px; opacity: 0.5; }
+.chev path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.dpad .chev { position: absolute; }
+.dpad .up    { top: 5px;   left: 50%; transform: translateX(-50%); }
+.dpad .down  { bottom: 5px; left: 50%; transform: translateX(-50%); }
+.dpad .left  { left: 8px;  top: 50%; transform: translateY(-50%); }
+.dpad .right { right: 8px; top: 50%; transform: translateY(-50%); }
+#scroll-btn .ctrl-lbl { font-size: 10.5px; letter-spacing: 0.03em; }   /* NAVIGATE is longer — keep it clear of the chevrons */
+.phone-text {
+  margin: 4px 16px 8px; min-height: 24px; font-size: 16px; color: #e8eaed;
+  border-bottom: 1.5px solid rgba(255,255,255,0.16); padding-bottom: 6px; word-break: break-word;
+}
+/* controls: a "?" toggle on the surface reveals a compact card (matches the HUD cheat-sheet) */
+#phone-help-btn {   /* floats just above the surface's top-right, outside the sheet */
+  position: absolute; top: -42px; right: 14px; z-index: 6;
+  width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.18); background: rgba(30,31,34,0.8); backdrop-filter: blur(6px);
+  color: #d6d9de; font: 600 14px system-ui; line-height: 1; padding: 0;
+}
+#phone-help-btn.on { background: var(--accent); color: #fff; border-color: transparent; }
+#phone-help {
+  position: absolute; bottom: 100%; left: 12px; right: 12px; margin-bottom: 50px;
+  background: #26282d; border: 1px solid rgba(255,255,255,0.09); border-radius: 14px;
+  padding: 11px 14px; box-shadow: 0 -8px 26px rgba(0,0,0,0.45);
+  display: flex; flex-direction: column; gap: 8px;
+}
+#phone-help .ph-row { display: flex; align-items: baseline; gap: 12px; }
+#phone-help .ph-row b { flex: 0 0 62px; color: #e8eaed; font: 700 10.5px system-ui; letter-spacing: 0.08em; }
+#phone-help .ph-row span { font-size: 12px; color: #9aa0a6; }
+/* gesture-navigation pill */
+#navpill {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 9;
+  width: 36%; height: 5px; border-radius: 999px; background: rgba(232,234,237,0.55);
+}
+
+/* ===================== Gboard-style keyboard (shared) ===================== */
+/* Gboard light theme: gray panel, flat borderless keys, uppercase letters,
+   a suggestion strip on top, blue glide ribbon. Sized in cqw for the HUD;
+   the phone overrides with px touch targets (.kb--live / .phone-page). */
+.kb-panel { background: #1b1c1f; padding: 2cqw 1.5cqw 1.5cqw; }
+.kb-suggest {
+  display: flex; align-items: center; height: 7cqw; color: #bdc1c6; font-size: 3.8cqw;
+}
+.kb-suggest .sugg {
+  flex: 1; text-align: center; padding: 0 6px; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  border-right: 1px solid rgba(255,255,255,0.12);
+}
+.kb-suggest .sugg:last-child { border-right: none; }
+.kb-suggest .sugg.strong { color: #e8eaed; font-weight: 600; }
+
+.kb { display: flex; flex-direction: column; gap: 2cqw; }
+.kb-row { display: flex; gap: 1.6cqw; justify-content: center; }
+.kb-key {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: #3a3b40; border-radius: 1.2cqw; font-size: 5cqw; color: #e8eaed;
+  box-shadow: 0 0.3cqw 0 rgba(0,0,0,0.35); padding: 2.6cqw 0; min-width: 0;
+}
+.kb-key--fn, .kb-key--sym { background: #292a2e; color: #e8eaed; flex: 1.4; font-size: 3.8cqw; }
+.kb-key--space { flex: 5; }
+.kb-key--return { flex: 1.6; }
+.kb-key--punct { flex: 0.8; }
+.kb-key.hover, .kb-key.hl { background: var(--accent); color: #fff; }   /* demo hover highlight */
+
+#kb-wrap { position: relative; }
+#kb-trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+#kb-trail polyline {
+  fill: none; stroke: rgba(66,133,244,0.55); stroke-width: 8;   /* Gboard blue glide ribbon */
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* phone's live keyboard: px touch targets */
+.phone-page .kb-panel { padding: 8px 6px 12px; }
+.phone-page .kb-suggest { height: 40px; font-size: 15px; }
+.kb--live { gap: 6px; container-type: normal; }
+.kb--live .kb-row { gap: 5px; }
+.kb--live .kb-key {
+  font-size: 18px; border-radius: 7px; padding: 8px 0; min-height: 34px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.12); touch-action: none;
+}
+.kb--live .kb-key--fn, .kb--live .kb-key--sym { font-size: 14px; }
+#phone-kb { touch-action: none; }
+
+/* phone keyboard keeps px key shadow on the dark theme */
+.kb--live .kb-key { box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+
+/* ============================ shared bits ============================ */
+.hidden { display: none !important; }
+#conn {
+  position: absolute; z-index: 6; right: 14px; top: 12px;
+  font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+}
+#conn.on { color: #1f9d55; }
+#conn.off { opacity: 0.5; }
