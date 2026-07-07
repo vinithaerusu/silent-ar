@@ -286,16 +286,19 @@ body.phone-page #conn.on { color: #81c995; }
 .hc-time { font-size: 60px; font-weight: 400; letter-spacing: -1px; line-height: 1; }
 .hc-date { font-size: 15px; font-weight: 500; margin-top: 8px; color: #e2e5ea; }
 /* Meta control — Material FAB */
-#float-icon {   /* Snapchat-style yellow control with the ghost */
-  position: absolute; right: 22px; bottom: 96px; width: 62px; height: 62px; border-radius: 20px;
-  border: none; cursor: pointer; background: #FFFC00;
+#float-icon {   /* Snapchat launcher — flat brand-yellow squircle with the ghost */
+  position: absolute; right: 22px; bottom: 96px; width: 64px; height: 64px;
+  border: none; cursor: pointer; padding: 0;
+  border-radius: 30% / 32%;                 /* squircle, like the real app icon */
+  background: #FFFC00;                        /* flat Snapchat yellow — no gloss/gradient */
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.4);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.32);   /* single soft floating shadow */
+  transition: transform 0.14s cubic-bezier(0.2,0.7,0.3,1), box-shadow 0.14s ease;
 }
-#float-icon svg { width: 36px; height: 36px; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.18)); }
-#float-icon:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(0,0,0,0.26); }
-#float-icon:active { transform: scale(0.96); }
+/* warm edge + soft depth shadow so the white ghost reads clearly on the yellow */
+#float-icon svg { width: 40px; height: 40px; filter: drop-shadow(0 0 1.2px rgba(120,90,0,0.55)) drop-shadow(0 2px 3px rgba(90,65,0,0.35)); }
+#float-icon:hover { transform: translateY(-1.5px); box-shadow: 0 12px 24px rgba(0,0,0,0.34); }
+#float-icon:active { transform: scale(0.95); box-shadow: 0 5px 12px rgba(0,0,0,0.3); }
 
 /* control surface — Material bottom sheet */
 #surface {

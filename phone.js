@@ -21,7 +21,7 @@ const conn      = document.getElementById("conn");
 const phoneSuggest = document.getElementById("phone-suggest");
 
 renderKeyboard(phoneKb);
-floatIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="#fff" d="M12 2.6c-3.1 0-5.2 2.2-5.2 5.4v6.6c0 .8.9 1.3 1.5.8l.9-.6c.3-.2.7-.2 1 0l1.2.8c.4.3.9.3 1.3 0l1.2-.8c.3-.2.7-.2 1 0l.9.6c.6.5 1.5 0 1.5-.8V8c0-3.2-2.1-5.4-5.3-5.4z"/></svg>`;
+floatIcon.innerHTML = `<svg viewBox="0 0 24 24"><path fill="#fff" d="M12 2.4c-3.25 0-5.5 2.4-5.5 5.7v5.85c0 .5-.24.78-.68 1.02-.6.33-.5 1.14.16 1.3.53.13.94.44 1.16.92.14.3.5.42.79.27l.94-.5c.32-.17.7-.14.99.07l1.07.78c.4.29.94.29 1.34 0l1.07-.78c.29-.21.67-.24.99-.07l.94.5c.29.15.65.03.79-.27.22-.48.63-.79 1.16-.92.66-.16.76-.97.16-1.3-.44-.24-.68-.52-.68-1.02V8.1c0-3.3-2.25-5.7-5.5-5.7z"/></svg>`;
 let text = "";                              // the query text
 let currentSuggest = [], lastInsert = null;
 let hudKb = false, woke = false;            // is the HUD showing the keyboard? / first-touch wake gesture
