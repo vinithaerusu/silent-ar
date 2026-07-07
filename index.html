@@ -58,6 +58,14 @@
       const open = body.classList.toggle("phone-open");
       lbl.textContent = open ? "Hide phone" : "Phone";
     });
+
+    // Route keyboard focus to the HUD iframe so BCI number keys (SSVEP 1-4) work without a click.
+    const hudWrap = document.getElementById("hud-wrap");
+    const hudFrame = hudWrap.querySelector("iframe");
+    const focusHud = () => { try { hudFrame.contentWindow.focus(); } catch (e) {} };
+    hudFrame.addEventListener("load", focusHud);
+    hudWrap.addEventListener("pointerenter", focusHud);
+    window.addEventListener("load", () => setTimeout(focusHud, 60));
   </script>
 </body>
 </html>

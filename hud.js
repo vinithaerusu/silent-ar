@@ -35,6 +35,7 @@ const chatDefaults = chatEl.querySelector(".chat-defaults");
 const chatCam      = document.getElementById("chat-cam");
 const chatField    = document.getElementById("chat-field");
 const modeBadge    = document.getElementById("mode-badge");
+const hudChrome    = document.getElementById("hud-chrome");   // Snap AI identity header — shown only with a card
 const helpBtn      = document.getElementById("help-btn");
 const helpPanel    = document.getElementById("help-panel");
 const feedToggle   = document.getElementById("feed-toggle");
@@ -99,7 +100,6 @@ let menuIdx = 0, qSub = "input";      // menu focus (menuIdx===currentActions.le
 let currentActions = [], menuLoading = false, loadingMsg = "";
 let query = "", scale = 1;
 let inputMode = "bci";                // BCI is the HUD's only input modality (the phone is the other path)
-const SSVEP_FREQ = [7.5, 10, 12, 15]; // Hz for the flickering targets (stylized)
 let aim = null, dwell = 0, dwellId = null, tPrev = performance.now();   // BCI head-aim reticle + dwell-to-select
 let lock = { el: null, run: null, progress: 0 };                        // BCI SSVEP lock: number-key -> fill -> commit
 let metaAI = false, chat = [];        // Meta AI assistant conversation
@@ -114,6 +114,7 @@ async function init() {               // called at the very end of the file, aft
   openMetaAI();                       // default view when the page loads: Meta AI home
   setFeed(feedSource);                // apply the default feed (street) to the ambient view + toggle
   idle.classList.add("hidden");
+  try { window.focus(); } catch (_) {}   // grab keyboard focus so BCI number keys work without a click (HUD runs in an iframe)
   requestAnimationFrame(loop);
   try {
     await startCamera();
@@ -258,21 +259,35 @@ function loop(now) {
     const t = now || performance.now();
     const dt = Math.min(0.05, (t - tPrev) / 1000); tPrev = t;
     if (feedSource === "street") { renderStreetFeed(); drawWorld(); }   // keep the street feed + backdrop current
-    const foc = stage === "browse" ? focused() : null;   // compute focus once per frame
+    // browse focus: while head-pointing (reticle active) it's ONLY the object under the
+    // reticle — no object selected over empty space; otherwise fall back to phone-driven focus.
+    const foc = stage === "browse" ? (aim ? aimedObject() : focused()) : null;
     if (inputMode === "bci") {
-      if (stage === "browse") dwellTick(dt, foc);         // object: aim + dwell
+      if (stage === "browse") dwellTick(dt, foc);         // object: head-point + dwell
       else if (stage === "menu" || stage === "chat") tickLock(dt);   // menu: number-key SSVEP fill
     }
     draw(foc);                          // full-FOV overlay: object boxes + reticle in browse, clear otherwise
   } catch (e) { console.error("HUD loop error:", e && e.stack || e); }
   requestAnimationFrame(loop);                            // ALWAYS reschedule
 }
+// the detection whose box the head-aim reticle is inside (smallest wins on overlap), else null
+function aimedObject() {
+  if (!aim) return null;
+  const t = coverT();
+  let hit = null, hitArea = Infinity;
+  for (const d of detections) {
+    const [ox, oy, ow, oh] = d.bbox;
+    const bx = ox * t.s + t.ox, by = oy * t.s + t.oy, bw = ow * t.s, bh = oh * t.s;
+    if (aim.x >= bx && aim.x <= bx + bw && aim.y >= by && aim.y <= by + bh && bw * bh < hitArea) { hit = d; hitArea = bw * bh; }
+  }
+  return hit;
+}
 function dwellTick(dt, foc) {
-  if (foc && aim) {
+  if (foc && aim) {                              // reticle is over an object -> hold to select
     if (dwellId !== foc.id) { dwellId = foc.id; dwell = 0; }
-    dwell += dt / 2.0;                            // 2.0s SSVEP dwell (matches the BCI repo)
-    if (dwell >= 1) { dwell = 0; dwellId = null; openMenu(); }
-  } else {
+    dwell += dt / 1.5;                            // 1.5s head-aim dwell -> opens the object's menu
+    if (dwell >= 1) { dwell = 0; dwellId = null; openMenu(foc); }
+  } else {                                        // over empty space (or no reticle) -> nothing selected, decay
     dwell = Math.max(0, dwell - dt / 0.8);
     if (dwell === 0) dwellId = null;
   }
@@ -301,22 +316,16 @@ function draw(foc) {
     const [x, y, w, h] = d.bbox;
     const bx = x * t.s + t.ox, by = y * t.s + t.oy, bw = w * t.s, bh = h * t.s;
     const on = d === foc;
-    if (bci) {                                            // SSVEP: flickering translucent white fill (box stays solid)
-      const f = SSVEP_FREQ[i % 4];
-      dctx.globalAlpha = 0.12 + 0.14 * (0.5 + 0.5 * Math.sin(2 * Math.PI * f * performance.now() / 1000));
-      dctx.fillStyle = "#ffffff"; roundRect(bx, by, bw, bh, 6); dctx.fill();
-      dctx.globalAlpha = 1;
-    }
-    roundRect(bx, by, bw, bh, 6);                          // solid, always-visible outline — white, glows when focused
-    dctx.lineWidth = on ? 3 : 2;
-    dctx.strokeStyle = on ? "#ffffff" : "rgba(255,255,255,0.85)";
+    roundRect(bx, by, bw, bh, 6);                          // detection outline — dim by default, bright + glow when head-pointed
+    dctx.lineWidth = on ? 3 : 1.5;
+    dctx.strokeStyle = on ? "#ffffff" : "rgba(255,255,255,0.55)";
     dctx.shadowColor = on ? "rgba(255,255,255,0.9)" : "transparent";
     dctx.shadowBlur = on ? 14 : 0;
     dctx.stroke();
     dctx.shadowBlur = 0; dctx.shadowColor = "transparent";
-    if (bci && dwell > 0 && dwellId === d.id) {           // dwell loader — translucent white fill
+    if (bci && dwell > 0 && dwellId === d.id) {           // dwell fill — the pointed object fills as you hold
       dctx.save(); roundRect(bx, by, bw, bh, 6); dctx.clip();
-      dctx.fillStyle = "rgba(255,255,255,0.5)";
+      dctx.fillStyle = "rgba(255,255,255,0.45)";
       dctx.fillRect(bx, by, bw * dwell, bh);
       dctx.restore();
     }
@@ -327,8 +336,15 @@ function draw(foc) {
       dctx.fillStyle = "#14171d"; dctx.fillText(d.class, bx + 7, Math.max(15, by - 6));
     }
   });
-  if (bci) {                                              // head-aim reticle — white
+  if (bci) {                                              // head-aim reticle + dwell progress ring
     const p = aim || { x: dcanvas.width / 2, y: dcanvas.height / 2 };
+    if (dwell > 0) {                                       // ring sweeps as you hold your gaze -> select
+      dctx.strokeStyle = "rgba(255,255,255,0.35)"; dctx.lineWidth = 3;
+      dctx.beginPath(); dctx.arc(p.x, p.y, 15, 0, 2 * Math.PI); dctx.stroke();
+      dctx.strokeStyle = "#ffffff"; dctx.lineWidth = 3; dctx.lineCap = "round";
+      dctx.beginPath(); dctx.arc(p.x, p.y, 15, -Math.PI / 2, -Math.PI / 2 + dwell * 2 * Math.PI); dctx.stroke();
+      dctx.lineCap = "butt";
+    }
     dctx.strokeStyle = "#ffffff"; dctx.lineWidth = 2;
     dctx.beginPath(); dctx.arc(p.x, p.y, 9, 0, 2 * Math.PI); dctx.stroke();
     dctx.fillStyle = "#ffffff"; dctx.beginPath(); dctx.arc(p.x, p.y, 2.5, 0, 2 * Math.PI); dctx.fill();
@@ -420,12 +436,13 @@ function show(st) {
   kbview.classList.toggle("hidden", st !== "keyboard");
   resultEl.classList.toggle("hidden", st !== "result");
   chatEl.classList.toggle("hidden", st !== "chat");
+  hudChrome.classList.toggle("hidden", st === "browse");   // hide the Snap AI header in CV detection (no card there)
   Sync.send("hudkb", { open: st === "keyboard" });   // tell the phone whether its keyboard is live on the HUD
 }
 
 // ---- select an object -> ask the model for context actions ----
-function openMenu() {
-  const f = focused(); if (!f) return;
+function openMenu(target) {
+  const f = target || focused(); if (!f) return;   // head-aim passes the hovered object; phone select uses focus
   metaAI = false;
   selObj = f.class;
   selImg = cropObject(f);
@@ -594,23 +611,16 @@ async function chatSend(t) {
 window.addEventListener("keydown", onKey);
 window.addEventListener("keyup", onKeyUp);
 window.addEventListener("mousemove", onAim);   // BCI head-aim (mouse stands in for head-pointing)
-function onAim(e) {
+// keep keyboard focus on the HUD whenever the pointer is over it, so the SSVEP number keys fire
+// without first clicking (the HUD is an iframe inside index.html, which otherwise holds focus)
+document.addEventListener("pointerover", () => { if (!document.hasFocus()) window.focus(); });
+window.addEventListener("pointerdown", () => window.focus());
+function onAim(e) {                               // move the head-aim reticle; the hovered object is derived in aimedObject()
   if (inputMode !== "bci" || stage !== "browse") { aim = null; return; }
   const r = dcanvas.getBoundingClientRect();
   const x = (e.clientX - r.left) * dcanvas.width / r.width;
   const y = (e.clientY - r.top) * dcanvas.height / r.height;
-  if (x < 0 || y < 0 || x > dcanvas.width || y > dcanvas.height) { aim = null; return; }
-  aim = { x, y };
-  const t = coverT();                            // focus the object under the reticle
-  let best = null, bd = Infinity;
-  detections.forEach((d) => {
-    const [ox, oy, ow, oh] = d.bbox;
-    const bx = ox * t.s + t.ox, by = oy * t.s + t.oy, bw = ow * t.s, bh = oh * t.s;
-    const inside = x >= bx && x <= bx + bw && y >= by && y <= by + bh;
-    const dd = Math.hypot(x - (bx + bw / 2), y - (by + bh / 2)) - (inside ? 1e6 : 0);
-    if (dd < bd) { bd = dd; best = d; }
-  });
-  if (best) focusId = best.id;
+  aim = (x < 0 || y < 0 || x > dcanvas.width || y > dcanvas.height) ? null : { x, y };
 }
 function onKey(e) {
   if (stage === "keyboard") {                                    // either modality can also type the query
