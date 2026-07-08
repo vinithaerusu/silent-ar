@@ -42,6 +42,23 @@ floatIcon.addEventListener("click", () => {
   surface.classList.remove("hidden");
 });
 
+// ---- close the controller: back to the phone home (and dismiss the HUD keyboard) ----
+function closeController() {
+  if (surface.classList.contains("hidden")) return;
+  surface.classList.add("hidden");
+  floatIcon.classList.remove("hidden");
+  if (hudKb) { hudKb = false; Sync.send("keyboard:close"); }
+}
+
+// ---- Pixel-style home gesture: swipe up on the nav pill to close the controller ----
+const navpill = document.getElementById("navpill");
+if (navpill) {
+  navpill.style.cursor = "grab"; navpill.style.touchAction = "none";
+  let npY = null;
+  navpill.addEventListener("pointerdown", (e) => { npY = e.clientY; try { navpill.setPointerCapture(e.pointerId); } catch (_) {} });
+  navpill.addEventListener("pointerup", (e) => { if (npY != null && npY - e.clientY > 22) closeController(); npY = null; });   // swiped up -> home
+}
+
 // ---- controls cheat-sheet toggle ("?" on the surface) ----
 const phoneHelpBtn = document.getElementById("phone-help-btn");
 const phoneHelp = document.getElementById("phone-help");
@@ -49,11 +66,11 @@ if (phoneHelpBtn) phoneHelpBtn.addEventListener("click", () => {
   phoneHelp.classList.toggle("hidden"); phoneHelpBtn.classList.toggle("on");
 });
 
-// ---- tap anywhere outside the keyboard / buttons -> close the keyboard on the HUD ----
+// ---- tap anywhere outside the controller -> close it (also dismisses the HUD keyboard) ----
 document.addEventListener("pointerdown", (e) => {
   if (e.target.closest(".kb-panel") || e.target.closest(".ctrl-row") || e.target.closest("#float-icon") ||
-      e.target.closest("#phone-help-btn") || e.target.closest("#phone-help")) return;
-  if (hudKb) { hudKb = false; Sync.send("keyboard:close"); }
+      e.target.closest("#phone-help-btn") || e.target.closest("#phone-help") || e.target.closest("#navpill")) return;
+  closeController();
 });
 
 // ---- keyboard: tap = type, swipe = glide-type, drag-in-key = nothing ----

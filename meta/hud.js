@@ -108,7 +108,7 @@ const DEFAULTS = [
 ];
 
 async function init() {               // called at the very end of the file, after all state is initialized
-  openMetaAI();                       // default view when the page loads: Meta AI home
+  show("off");                        // default: the glasses display is blank — nothing shown until enabled
   setFeed(feedSource);                // apply the default feed (street) to the ambient view + toggle
   idle.classList.add("hidden");
   requestAnimationFrame(loop);
@@ -324,7 +324,7 @@ function draw(foc) {
       dctx.fillStyle = "#fff"; dctx.fillText(d.class, bx + 6, Math.max(12, by - 5));
     }
   });
-  if (bci) {                                              // head-aim reticle (fill loader is drawn on the object)
+  if (aim || bci) {                                       // head-aim reticle — both modes (dwell loader is BCI-only, drawn above)
     const p = aim || { x: dcanvas.width / 2, y: dcanvas.height / 2 };
     dctx.strokeStyle = "#4a9eff"; dctx.lineWidth = 2;
     dctx.beginPath(); dctx.arc(p.x, p.y, 9, 0, 2 * Math.PI); dctx.stroke();
@@ -418,6 +418,7 @@ function show(st) {
   kbview.classList.toggle("hidden", st !== "keyboard");
   resultEl.classList.toggle("hidden", st !== "result");
   chatEl.classList.toggle("hidden", st !== "chat");
+  display.classList.toggle("off", st === "off");     // "off" = blank display (glow + badge hidden, no card)
   Sync.send("hudkb", { open: st === "keyboard" });   // tell the phone whether its keyboard is live on the HUD
 }
 
@@ -465,7 +466,7 @@ function renderMenu() {
   camBtn.classList.toggle("active", onQuery && qSub === "camera");
   queryField.classList.toggle("active", onQuery && qSub === "input");
   ssvepClear(menuEl);
-  if (inputMode === "bci") ssvepApply([...optList.querySelectorAll(".opt-item"), camBtn, queryField]);
+  if (inputMode === "bci") ssvepApply([...optList.querySelectorAll(".opt-item"), camBtn]);   // text input isn't an SSVEP target
 }
 function openKeyboard() { show("keyboard"); setText(query); renderSuggest(hudSuggest, []); }
 
@@ -552,6 +553,7 @@ function openMetaAI() {
   metaAI = true; chat = []; query = "";
   chatIdx = DEFAULTS.length; chatSub = "input";     // default focus: the text input
   renderChat(); show("chat");
+  tourComplete("metaai");                           // enabling Meta AI satisfies the walkthrough's "enable" step
 }
 function renderChat() {
   chatThread.innerHTML = chat.map((m) => `<div class="msg ${m.role}">${escapeHtml(m.text)}</div>`).join("");
@@ -567,7 +569,7 @@ function renderChat() {
   chatField.classList.toggle("active", onQuery && chatSub === "input");
   chatThread.scrollTop = chatThread.scrollHeight;
   ssvepClear(chatEl);
-  if (inputMode === "bci") ssvepApply([...chatDefaults.querySelectorAll(".opt-item"), chatCam, chatField]);
+  if (inputMode === "bci") ssvepApply([...chatDefaults.querySelectorAll(".opt-item"), chatCam]);   // text input isn't an SSVEP target
 }
 function runDefault(d) {
   chat.push({ role: "user", text: d.label });
@@ -593,9 +595,11 @@ async function chatSend(t) {
 }
 window.addEventListener("keydown", onKey);
 window.addEventListener("keyup", onKeyUp);
-window.addEventListener("mousemove", onAim);   // BCI head-aim (mouse stands in for head-pointing)
+window.addEventListener("mousemove", onAim);   // head-aim (mouse stands in for head-pointing) — both modes in the camera view
+// Neural Band "tap" = a mouse click selects the object you're pointing at (dwell is the BCI equivalent)
+dcanvas.addEventListener("click", () => { if (stage === "browse" && inputMode !== "bci") { const f = focused(); if (f) openMenu(); } });
 function onAim(e) {
-  if (inputMode !== "bci" || stage !== "browse") { aim = null; return; }
+  if (stage !== "browse") { aim = null; return; }
   const r = dcanvas.getBoundingClientRect();
   const x = (e.clientX - r.left) * dcanvas.width / r.width;
   const y = (e.clientY - r.top) * dcanvas.height / r.height;
@@ -667,22 +671,20 @@ function onKeyUp(e) {
 }
 function bciSelect(n) {
   if (stage === "menu" && !menuLoading) {
-    const len = currentActions.length;                                           // targets: actions, camera, input
-    const items = [...optList.querySelectorAll(".opt-item"), camBtn, queryField];
+    const len = currentActions.length;                                           // SSVEP targets: actions, camera (text input is phone/keyboard-only)
+    const items = [...optList.querySelectorAll(".opt-item"), camBtn];
     if (n >= items.length) return;
     startLock(items[n], () => {
       if (n < len) runAction(currentActions[n]);
-      else if (n === len) openCamera();
-      else openKeyboard();
+      else openCamera();                                                         // n === len -> camera
     });
   } else if (stage === "chat") {
-    const optCount = chat.length ? 0 : DEFAULTS.length;                          // targets: defaults, camera, input
-    const items = [...chatDefaults.querySelectorAll(".opt-item"), chatCam, chatField];
+    const optCount = chat.length ? 0 : DEFAULTS.length;                          // SSVEP targets: defaults, camera (text input is phone/keyboard-only)
+    const items = [...chatDefaults.querySelectorAll(".opt-item"), chatCam];
     if (n >= items.length) return;
     startLock(items[n], () => {
       if (n < optCount) runDefault(DEFAULTS[n]);
-      else if (n === optCount) { metaAI = false; openCamera(); }
-      else openKeyboard();
+      else { metaAI = false; openCamera(); }                                     // n === optCount -> camera
     });
   }
 }
@@ -729,73 +731,138 @@ Sync.on((m) => {
 Sync.send("hello");
 
 // ============ Guided walkthrough — a floating card over the live HUD, one modality at a time ============
+// Interactive walkthrough — each step prompts a real action; performing it (or the
+// proxy key) produces the effect and advances. `await` is the action id that completes
+// the step; `do` performs that effect (used by the Next button as a do-it-for-me path).
 const TOUR = [
-  { mod: "Welcome", title: "Meta Ray-Ban Display", spot: null, enter: () => { setMode("neural"); openMetaAI(); },
-    body: "A glanceable HUD in your glasses. You drive it three ways — Neural Band, BCI, and your phone. In this demo, keys and taps stand in for the real hardware.",
-    real: "wear the glasses", proxy: "click Next to begin" },
-  { mod: "Meta AI", title: "Your home surface", spot: "#display", enter: () => openMetaAI(),
-    body: "Meta AI is the home view — ask anything, or pick a quick action like your schedule or messages.",
-    real: "glance up", proxy: "—" },
-  { mod: "Neural Band", title: "Open the camera", spot: "#display", enter: () => openCamera(),
-    body: "Look at the world through the glasses camera — objects are detected live.",
-    real: "double-pinch", proxy: "C" },
-  { mod: "Neural Band", title: "Navigate", spot: "#display", enter: () => openCamera(),
-    body: "Move the focus between the detected objects around you.",
-    real: "thumb swipes across fingers", proxy: "← → ↑ ↓" },
-  { mod: "Neural Band", title: "Select", spot: "#display", enter: () => tourMenu(),
-    body: "Select the focused object — Meta AI reads it and offers context actions.",
-    real: "pinch index finger", proxy: "Enter" },
-  { mod: "Neural Band", title: "Zoom & back", spot: "#display", enter: () => {},
-    body: "Zoom the display in or out, or step back to the previous surface anytime.",
-    real: "pinch + twist  ·  double middle-pinch", proxy: "Z / X  ·  Esc" },
-  { mod: "Phone", title: "Touch controller", spot: null, enter: () => { setMode("neural"); openMetaAI(); },
-    body: "Your phone (on the right) is a touch controller for the HUD. Open the Meta control to get the ZOOM / NAVIGATE / BACK pad and keyboard.",
-    real: "hold your phone", proxy: "tap the phone panel" },
-  { mod: "Phone", title: "Navigate & glide-type", spot: null, enter: () => {},
-    body: "NAVIGATE: swipe to move focus, center-tap to select. Type by gliding across letters — a swipe becomes a word.",
-    real: "touch gestures", proxy: "phone NAVIGATE + keyboard" },
-  { mod: "BCI", title: "Activate", spot: null, enter: () => { setMode("bci"); openMetaAI(); },
-    body: "Switch to the brain-computer modality. A tongue press toggles it on and off.",
-    real: "tongue press", proxy: "hold T" },
-  { mod: "BCI", title: "SSVEP select", spot: "#display", enter: () => { setMode("bci"); openMetaAI(); },
-    body: "Targets flicker at different rates; focusing your gaze on one selects it — a fill confirms the lock.",
-    real: "look at a flickering target", proxy: "keys 1 – 4" },
-  { mod: "BCI", title: "Head-aim + dwell", spot: "#display", enter: () => { setMode("bci"); openCamera(); },
-    body: "In the camera view, aim at an object and hold your gaze — a dwell timer selects it. Double-tap to go back.",
-    real: "hold gaze (dwell)  ·  tongue double-tap", proxy: "mouse-aim + hold  ·  double-tap T" },
-  { mod: "Demo", title: "The camera feed", spot: "#feed-toggle", enter: () => { setMode("neural"); },
-    body: "For demos, swap the live webcam for a 360° street you can pan — same detection and actions, on a rich scene.",
-    real: "— (demo aid)", proxy: "V  ·  Live / Street toggle" },
-  { mod: "Done", title: "You're set", spot: "#help-btn", enter: () => { setMode("neural"); openMetaAI(); },
-    body: "That's the walkthrough. Tap ? anytime for the full controls, and try the keys and phone yourself.",
-    real: "—", proxy: "?  = controls" },
+  { mod: "Neural Band", title: "", spot: "#display",
+    body: "Double tap your thumb on the side of your index finger using the Meta Neural Band, or press the M proxy key on the keyboard to enable Meta AI.",
+    real: "double-tap thumb on index finger", proxy: "M",
+    enter: () => { setMode("neural"); show("off"); },   // start blank; wait for the user to enable it
+    await: "metaai", do: () => openMetaAI() },
+  // Step 2 — the curated suggestions (info only)
+  { mod: "Meta AI", title: "", spot: ".chat-defaults",
+    body: "Meta AI's three suggestions are curated for the moment — learned from your habits, what the camera sees around you, and the time of day.",
+    real: "", proxy: "",
+    enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 3 — the camera option
+  { mod: "Meta AI", title: "", spot: "#chat-cam",
+    body: "Meta AI provides a camera option to select an object from the camera feed to use in your query.",
+    real: "", proxy: "",
+    enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 4 — navigate + select the options (Neural Band trackpad)
+  { mod: "Neural Band", title: "", spot: ".chat-defaults, .chat-row",
+    body: "Your index finger works like a trackpad — swipe your thumb across it in any direction using the Meta Neural Band, or use the arrow proxy keys on the keyboard, to move through the options. Tap your index finger on your thumb using the Meta Neural Band, or press the Enter proxy key on the keyboard to select an option.",
+    real: "swipe to move · tap to select", proxy: "←  ↑  ↓  →   ·   Enter",
+    enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 5 — the camera view (point + select an object from the feed)
+  { mod: "Neural Band", title: "", spot: "#display",
+    body: "When you select the camera option, you are presented with a view of the camera feed from your Meta glasses. You can point your head to focus on the object and tap your index finger on your thumb to select it using the Neural Band, or use your mouse as a proxy to point and click to select an object from the camera view.",
+    real: "point head · tap finger on thumb", proxy: "mouse — point + click",
+    enter: () => { setMode("neural"); openCamera(); } },
+  // Step 6 — the object's suggested actions (context actions for the selection)
+  { mod: "Meta AI", title: "", spot: ".opt-list",
+    body: "Select an object from the camera feed, and Meta AI gives you three suggested actions — curated from what it is, your habits, what the camera sees around you, and the time of day.",
+    real: "", proxy: "",
+    enter: () => { setMode("neural"); tourMenu(); } },
+  // Step 7 — the BCI/EMG modality (SSVEP flicker + dwell/number to select)
+  { mod: "BCI/EMG", title: "", spot: null,
+    body: "Toggle BCI/EMG mode on and off with a long press of your tongue to the roof of your mouth. The selectable options now flicker at different frequencies — rest your gaze on one and a loader fills to select it. Double-tap your tongue to go back a page. As keyboard proxies: hold T to toggle, press an option's number to fill the loader, and double-tap T to go back.",
+    real: "long tongue-press · gaze dwell · double tongue-tap", proxy: "hold T · keys 1–4 · double-tap T",
+    enter: () => { setMode("bci"); tourMenu(); } },
+  // --- Phone (Meta Controller) steps — cards + spotlights render over the phone via the parent ---
+  // Step 8 — open the Meta Controller
+  { mod: "Phone", device: "phone", spot: "#float-icon", needsController: false,
+    body: "On the go, your phone doubles as a controller for the glasses — type and navigate the HUD while staying heads-up. Press the floating button to open the Meta Controller.",
+    real: "tap the floating button", proxy: "mouse click",
+    enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 9 — the keyboard
+  { mod: "Phone", device: "phone", spot: "#phone-kb", needsController: true,
+    body: "Touch the keyboard to activate it, then swipe across letters to glide-type or tap to type. For a precise single key, touch and drag within the keys to hover it, and tap to select.",
+    real: "tap · swipe · drag-hover + tap", proxy: "mouse — same gestures",
+    enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 10 — close the keyboard / controller (card sits above the controller)
+  { mod: "Phone", device: "phone", spot: "@above-controller", needsController: true,
+    body: "Tap anywhere outside the meta controller to close it — it dismisses on the HUD too.",
+    real: "tap outside", proxy: "mouse click outside",
+    enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 11 — ZOOM
+  { mod: "Phone", device: "phone", spot: "#zoom-btn", needsController: true,
+    body: "Swipe up or down on the ZOOM button to zoom in and out on the HUD.",
+    real: "swipe up / down", proxy: "mouse drag up / down",
+    enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 12 — NAVIGATE
+  { mod: "Phone", device: "phone", spot: "#scroll-btn", needsController: true,
+    body: "Swipe on the NAVIGATE button to move through items, and tap it to select.",
+    real: "swipe · tap", proxy: "mouse drag · click",
+    enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 13 — BACK
+  { mod: "Phone", device: "phone", spot: "#back-btn", needsController: true,
+    body: "Tap the BACK button to go back a page.",
+    real: "tap", proxy: "mouse click",
+    enter: () => { setMode("neural"); openMetaAI(); } },
 ];
-let tourIdx = 0, tourActive = false;
-function tourStart() { tourActive = true; tourIdx = 0; const b = document.getElementById("tour-btn"); if (b) b.style.display = "none"; document.getElementById("tour").classList.remove("hidden"); tourRender(); }
-function tourEnd() { tourActive = false; document.getElementById("tour").classList.add("hidden"); tourSpot(null); const b = document.getElementById("tour-btn"); if (b) b.style.display = ""; setMode("neural"); openMetaAI(); }
-function tourNext() { if (tourIdx >= TOUR.length - 1) return tourEnd(); tourIdx++; tourRender(); }
+let tourIdx = 0, tourActive = false, tourSpotSel = null;
+function tourStart() { tourActive = true; tourIdx = 0; const b = document.getElementById("tour-btn"); if (b) b.style.display = "none"; document.getElementById("tour").classList.remove("hidden"); tourRender(); requestAnimationFrame(tourSpotTick); }
+function tourFinish(keep) {                        // keep=true leaves the last step's result on screen; false = back to blank
+  tourActive = false; document.getElementById("tour").classList.add("hidden"); tourSpot(null);
+  try { window.parent.__tourPhoneHide(); } catch (_) {}   // clear the phone overlay if the tour ended on a phone step
+  const b = document.getElementById("tour-btn"); if (b) b.style.display = "";
+  if (!keep) { setMode("neural"); show("off"); }
+}
+function tourEnd() { tourFinish(false); }         // Skip -> abort back to the blank default
+function tourNext() { if (tourIdx >= TOUR.length - 1) return tourFinish(true); tourIdx++; tourRender(); }
 function tourPrev() { if (tourIdx > 0) { tourIdx--; tourRender(); } }
+// an in-world action (real gesture proxy) satisfied the current step -> advance
+function tourComplete(action) { if (tourActive && TOUR[tourIdx] && TOUR[tourIdx].await === action) tourNext(); }
+function tourPhoneData(s) {   // payload the parent uses to render the card + spotlight over the phone
+  return { mod: s.mod, body: s.body, real: s.real, proxy: s.proxy, spot: s.spot, needsController: s.needsController,
+           idx: tourIdx, total: TOUR.length, canPrev: tourIdx > 0, isLast: tourIdx === TOUR.length - 1 };
+}
 function tourRender() {
   const s = TOUR[tourIdx], el = document.getElementById("tour");
   if (s.enter) { try { s.enter(); } catch (_) {} }
-  el.querySelector(".tour-mod").textContent = s.mod;
+  if (s.device === "phone") {                        // phone step: the parent renders the card + spotlight over the phone
+    el.classList.add("hidden"); tourSpot(null);      // hide the HUD card + spotlight
+    try { window.parent.__tourPhoneShow(tourPhoneData(s)); } catch (_) {}
+    return;
+  }
+  try { window.parent.__tourPhoneHide(); } catch (_) {}   // HUD step: make sure the phone overlay is gone
+  el.classList.remove("hidden");
+  const mod = el.querySelector(".tour-mod"); mod.textContent = s.mod || ""; mod.classList.toggle("hidden", !s.mod);
   el.querySelector(".tour-count").textContent = (tourIdx + 1) + " / " + TOUR.length;
-  el.querySelector(".tour-title").textContent = s.title;
+  const title = el.querySelector(".tour-title"); title.textContent = s.title || ""; title.classList.toggle("hidden", !s.title);
   el.querySelector(".tour-body").textContent = s.body;
-  el.querySelector(".tour-real").textContent = s.real || "—";
-  el.querySelector(".tour-proxy").textContent = s.proxy || "—";
+  const map = el.querySelector(".tour-map"), hasMap = !!(s.real || s.proxy);   // hide the Real/Proxy rows when the step has none
+  map.classList.toggle("hidden", !hasMap);
+  if (hasMap) { el.querySelector(".tour-real").textContent = s.real || "—"; el.querySelector(".tour-proxy").textContent = s.proxy || "—"; }
   el.querySelector(".tour-prev").disabled = tourIdx === 0;
   el.querySelector(".tour-next").textContent = tourIdx === TOUR.length - 1 ? "Done ✓" : "Next ›";
-  requestAnimationFrame(() => tourSpot(s.spot));   // spot after the scene lays out
+  tourSpot(s.spot);   // debounced — positions after the view lays out
 }
-function tourSpot(sel) {
+function tourSpot(sel) {                                           // set the current step's spotlight target
+  tourSpotSel = sel || null;
+  if (!tourSpotSel) document.getElementById("tour-spot").classList.add("hidden");
+}
+function tourSpotTick() {                                          // keep the spotlight pinned to its target each frame (robust vs. reflow/timing)
+  if (!tourActive) return;
   const spot = document.getElementById("tour-spot");
-  const el = sel ? document.querySelector(sel) : null;
-  if (!el) { spot.classList.add("hidden"); return; }
-  const vp = document.getElementById("viewport").getBoundingClientRect(), r = el.getBoundingClientRect(), pad = 6;
-  spot.style.left = (r.left - vp.left - pad) + "px"; spot.style.top = (r.top - vp.top - pad) + "px";
-  spot.style.width = (r.width + pad * 2) + "px"; spot.style.height = (r.height + pad * 2) + "px";
-  spot.classList.remove("hidden");
+  if (tourSpotSel) {
+    let box = null;                                               // union of every matched element (sel may be comma-separated)
+    document.querySelectorAll(tourSpotSel).forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      box = box ? { l: Math.min(box.l, r.left), t: Math.min(box.t, r.top), r: Math.max(box.r, r.right), b: Math.max(box.b, r.bottom) }
+                : { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    });
+    if (box) {
+      const vp = document.getElementById("viewport").getBoundingClientRect(), pad = 6;
+      spot.style.left = (box.l - vp.left - pad) + "px"; spot.style.top = (box.t - vp.top - pad) + "px";
+      spot.style.width = (box.r - box.l + pad * 2) + "px"; spot.style.height = (box.b - box.t + pad * 2) + "px";
+      spot.classList.remove("hidden");
+    } else spot.classList.add("hidden");
+  }
+  requestAnimationFrame(tourSpotTick);
 }
 function tourMenu() {   // open an action card reliably, even before a live detection lands
   if (stage === "browse") { const f = focused(); if (f) return openMenu(); }
@@ -806,7 +873,11 @@ function tourMenu() {   // open an action card reliably, even before a live dete
 (function wireTour() {
   const el = document.getElementById("tour"), btn = document.getElementById("tour-btn");
   if (btn) btn.addEventListener("click", tourStart);
-  el.querySelector(".tour-next").addEventListener("click", tourNext);
+  el.querySelector(".tour-next").addEventListener("click", () => {
+    const s = TOUR[tourIdx];
+    if (s && s.await && s.do) s.do();   // do-it-for-me: perform the action; its effect advances the tour
+    else tourNext();
+  });
   el.querySelector(".tour-prev").addEventListener("click", tourPrev);
   el.querySelector(".tour-skip").addEventListener("click", tourEnd);
 })();

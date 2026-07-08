@@ -57,6 +57,9 @@ body.hud-page { background: #000; color: #fff; height: 100vh; display: flex; ali
   transform-origin: bottom right; transition: transform 0.2s ease;
 }
 #dcanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* blank/off default — the display shows nothing (no glow, badge, or content) */
+#display.off { box-shadow: none; }
+#display.off #mode-badge, #display.off #conn { display: none; }
 #mode-badge {
   position: absolute; top: 3cqw; right: 3cqw; z-index: 4;
   display: inline-flex; align-items: center; gap: 1.6cqw;
@@ -151,13 +154,12 @@ body.hud-page { background: #000; color: #fff; height: 100vh; display: flex; ali
 
 /* guided tour overlay — floats over the live HUD (doesn't block it) */
 #tour { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
-#tour-spot {
-  position: absolute; border: 2px solid #4a9eff; border-radius: 12px; pointer-events: none;
-  box-shadow: 0 0 0 3px rgba(74,158,255,0.25), 0 0 22px rgba(74,158,255,0.5);
-  transition: left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease;
-  animation: tour-pulse 1.4s ease-in-out infinite;
+#tour-spot {   /* bright white ring so it stands out from the display's own blue glow */
+  position: absolute; border: 2.5px solid #fff; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.35), 0 0 20px rgba(255,255,255,0.75);
+  animation: tour-pulse 1.4s ease-in-out infinite;   /* no position transition — the pin loop tracks the target directly */
 }
-@keyframes tour-pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(74,158,255,0.22), 0 0 18px rgba(74,158,255,0.42); } 50% { box-shadow: 0 0 0 5px rgba(74,158,255,0.32), 0 0 30px rgba(74,158,255,0.62); } }
+@keyframes tour-pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(0,0,0,0.35), 0 0 16px rgba(255,255,255,0.6); } 50% { box-shadow: 0 0 0 4px rgba(0,0,0,0.4), 0 0 30px rgba(255,255,255,0.95); } }
 .tour-card {
   position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
   width: min(360px, 68%); pointer-events: auto;

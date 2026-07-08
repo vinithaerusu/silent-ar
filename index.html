@@ -48,6 +48,38 @@
     }
     #platform-switch button.active { background: #fff; color: #14171d; }
     #platform-switch button:not(.active):hover { color: #fff; }
+
+    /* phone-side tour overlay — card + spotlight the HUD tour drives over the phone controller */
+    #tour-phone { position: fixed; inset: 0; z-index: 40; pointer-events: none; display: none; }
+    #tour-phone.on { display: block; }
+    #tp-ring {
+      position: absolute; border: 2.5px solid #fff; border-radius: 12px; display: none;
+      box-shadow: 0 0 0 3px rgba(0,0,0,0.35), 0 0 20px rgba(255,255,255,0.75);
+      animation: tp-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes tp-pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(0,0,0,0.35), 0 0 16px rgba(255,255,255,0.6); } 50% { box-shadow: 0 0 0 4px rgba(0,0,0,0.4), 0 0 30px rgba(255,255,255,0.95); } }
+    #tp-card {
+      position: absolute; width: min(320px, 34vw); pointer-events: auto;
+      background: rgba(16,19,26,0.96); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px;
+      padding: 14px 16px 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.6); color: #eef1f6;
+    }
+    #tp-card .tp-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    #tp-card .tp-mod { font: 700 10px system-ui; letter-spacing: 0.1em; text-transform: uppercase; color: #9fc6ff; background: rgba(74,158,255,0.16); padding: 3px 8px; border-radius: 999px; }
+    #tp-card .tp-mod:empty { display: none; }
+    #tp-card .tp-count { font: 600 11px system-ui; color: rgba(255,255,255,0.5); }
+    #tp-card .tp-body { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.85); }
+    #tp-card .tp-map { margin: 10px 0 11px; display: flex; flex-direction: column; gap: 6px; }
+    #tp-card .tp-map.hidden { display: none; }
+    #tp-card .tp-row { display: flex; align-items: baseline; gap: 10px; font-size: 12.5px; }
+    #tp-card .tp-row .tl { flex: 0 0 42px; font: 700 10px system-ui; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.45); }
+    #tp-card .tp-real { color: rgba(255,255,255,0.72); font-style: italic; }
+    #tp-card .tp-proxy { color: #cfe4ff; font-weight: 600; }
+    #tp-card .tp-btns { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+    #tp-card .tp-btns button { cursor: pointer; border-radius: 9px; font: 600 12px system-ui; padding: 7px 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e8eaed; }
+    #tp-card .tp-nav { display: inline-flex; gap: 8px; }
+    #tp-card .tp-skip { color: rgba(255,255,255,0.55) !important; }
+    #tp-card .tp-next { background: #2f6fe0 !important; border-color: transparent !important; color: #fff !important; }
+    #tp-card .tp-prev:disabled { opacity: 0.35; cursor: default; }
   </style>
 </head>
 <body class="phone-open">
@@ -63,6 +95,23 @@
   <div id="platform-switch" title="Switch platform build">
     <button data-plat="snap" class="active">Snap</button>
     <button data-plat="meta">Meta</button>
+  </div>
+
+  <!-- phone-side tour overlay (driven by the HUD tour for phone/controller steps) -->
+  <div id="tour-phone">
+    <div id="tp-ring"></div>
+    <div id="tp-card">
+      <div class="tp-top"><span class="tp-mod"></span><span class="tp-count"></span></div>
+      <div class="tp-body"></div>
+      <div class="tp-map hidden">
+        <div class="tp-row"><span class="tl">Real</span><span class="tp-real"></span></div>
+        <div class="tp-row"><span class="tl">Proxy</span><span class="tp-proxy"></span></div>
+      </div>
+      <div class="tp-btns">
+        <button class="tp-skip">Skip</button>
+        <span class="tp-nav"><button class="tp-prev">‹ Back</button><button class="tp-next">Next ›</button></span>
+      </div>
+    </div>
   </div>
 
   <button id="phone-toggle" title="Show / hide the phone controller">
@@ -104,6 +153,75 @@
         setTimeout(focusHud, 120);
       });
     });
+
+    // ---- Phone-side tour overlay: the HUD tour calls these for phone/controller steps ----
+    const tphone = document.getElementById("tour-phone");
+    const tpRing = document.getElementById("tp-ring"), tpCard = document.getElementById("tp-card");
+    let tpData = null;
+    const phoneDoc = () => { try { return phoneFrame.contentDocument; } catch (e) { return null; } };
+
+    window.__tourPhoneShow = (d) => {
+      tpData = d;
+      body.classList.add("phone-open");                 // the phone must be visible for these steps
+      tphone.classList.add("on");
+      tpCard.querySelector(".tp-mod").textContent = d.mod || "";
+      tpCard.querySelector(".tp-count").textContent = (d.idx + 1) + " / " + d.total;
+      tpCard.querySelector(".tp-body").textContent = d.body || "";
+      const map = tpCard.querySelector(".tp-map"), hasMap = !!(d.real || d.proxy);
+      map.classList.toggle("hidden", !hasMap);
+      if (hasMap) { tpCard.querySelector(".tp-real").textContent = d.real || "—"; tpCard.querySelector(".tp-proxy").textContent = d.proxy || "—"; }
+      tpCard.querySelector(".tp-prev").disabled = !d.canPrev;
+      tpCard.querySelector(".tp-next").textContent = d.isLast ? "Done ✓" : "Next ›";
+      const pd = phoneDoc();                             // open/close the controller to match the step
+      if (pd) {
+        const surface = pd.getElementById("surface"), fab = pd.getElementById("float-icon");
+        if (d.needsController) { surface && surface.classList.remove("hidden"); fab && fab.classList.add("hidden"); }
+        else { surface && surface.classList.add("hidden"); fab && fab.classList.remove("hidden"); }
+      }
+    };
+    window.__tourPhoneHide = () => { tphone.classList.remove("on"); tpData = null; };
+
+    function tpTick() {                                  // keep the ring + card pinned to the phone element each frame
+      if (tpData) {
+        const pd = phoneDoc();
+        if (pd && tpData.spot === "@above-controller") {                            // special: card above the controller, ring the tap-outside zone
+          const surf = pd.getElementById("surface"), scr = pd.getElementById("phone");
+          if (surf && scr && scr.getBoundingClientRect().width) {
+            const fr = phoneFrame.getBoundingClientRect(), sr = surf.getBoundingClientRect(), pr = scr.getBoundingClientRect();
+            const phoneTop = fr.top + pr.top, phoneLeft = fr.left + pr.left, surfTop = fr.top + sr.top;
+            const cw = tpCard.offsetWidth || 320, ch = tpCard.offsetHeight || 150;
+            const cx = Math.max(12, phoneLeft + (pr.width - cw) / 2), cy = phoneTop + 46;   // card near the top of the phone
+            tpCard.style.left = cx + "px"; tpCard.style.top = cy + "px";
+            const ringTop = cy + ch + 10, ringBot = surfTop - 12;                   // ring the empty area between card and controller
+            if (ringBot > ringTop + 24) {
+              tpRing.style.left = (phoneLeft + 14) + "px"; tpRing.style.top = ringTop + "px";
+              tpRing.style.width = (pr.width - 28) + "px"; tpRing.style.height = (ringBot - ringTop) + "px";
+              tpRing.style.display = "block";
+            } else tpRing.style.display = "none";
+          } else tpRing.style.display = "none";
+        } else {
+          const el = pd && pd.querySelector(tpData.spot);
+          if (el && el.getBoundingClientRect().width) {
+            const fr = phoneFrame.getBoundingClientRect(), r = el.getBoundingClientRect(), pad = 6;
+            const left = fr.left + r.left, top = fr.top + r.top;
+            tpRing.style.left = (left - pad) + "px"; tpRing.style.top = (top - pad) + "px";
+            tpRing.style.width = (r.width + pad * 2) + "px"; tpRing.style.height = (r.height + pad * 2) + "px";
+            tpRing.style.display = "block";
+            const cw = tpCard.offsetWidth || 320, ch = tpCard.offsetHeight || 160, gap = 20;
+            let cx = left - gap - cw; if (cx < 12) cx = 12;                          // card sits to the left of the phone
+            let cy = Math.max(12, Math.min(top + r.height / 2 - ch / 2, window.innerHeight - ch - 12));
+            tpCard.style.left = cx + "px"; tpCard.style.top = cy + "px";
+          } else { tpRing.style.display = "none"; }
+        }
+      }
+      requestAnimationFrame(tpTick);
+    }
+    requestAnimationFrame(tpTick);
+
+    const hudTour = (fn) => { try { hudFrame.contentWindow[fn](); } catch (e) {} };
+    tpCard.querySelector(".tp-next").addEventListener("click", () => hudTour("tourNext"));
+    tpCard.querySelector(".tp-prev").addEventListener("click", () => hudTour("tourPrev"));
+    tpCard.querySelector(".tp-skip").addEventListener("click", () => hudTour("tourEnd"));
   </script>
 </body>
 </html>
