@@ -191,6 +191,32 @@ body.hud-page { background: #000; color: #fff; height: 100vh; display: flex; ali
 .tour-btns button:hover { filter: brightness(1.15); }
 .tour-prev:disabled { opacity: 0.35; cursor: default; }
 
+/* mode hub — the walkthrough's entry: briefly present each modality, pick one to see it in detail */
+#tour-hub { position: absolute; inset: 0; z-index: 31; display: flex; align-items: center; justify-content: center;
+  background: rgba(5,7,11,0.62); backdrop-filter: blur(4px); pointer-events: auto; }
+#tour-hub.hidden { display: none; }
+.th-card { width: min(90%, 340px); max-height: 94%; overflow-y: auto; background: rgba(16,20,27,0.97);
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 13px 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+.th-h { font-size: 14px; font-weight: 700; line-height: 1.22; }
+.th-sub { font-size: 11px; color: rgba(255,255,255,0.55); margin: 4px 0 10px; line-height: 1.4; }
+.th-sub b { color: rgba(255,255,255,0.86); font-weight: 700; }
+.th-modes { display: flex; flex-direction: column; gap: 7px; }
+.th-mode { text-align: left; background: #151a22; border: 1px solid rgba(255,255,255,0.1); border-radius: 11px;
+  padding: 9px 11px; cursor: pointer; color: #eef2f7; font: inherit; transition: .15s; }
+.th-mode:hover { border-color: #4a9eff; background: #182231; }
+.tm-top { display: flex; align-items: center; justify-content: space-between; }
+.tm-name { font-size: 12.5px; font-weight: 700; color: #9cc6ff; }
+.th-mode[data-group="bci"] .tm-name { color: #c9a6ff; }
+.th-mode[data-group="phone"] .tm-name { color: #8fe9dc; }
+.tm-arrow { font-size: 15px; color: rgba(255,255,255,0.28); }
+.th-mode:hover .tm-arrow { color: #4a9eff; }
+.tm-desc { font-size: 11px; color: #d3dbe4; margin: 3px 0 3px; line-height: 1.35; }
+.tm-solves { font-size: 10.5px; color: rgba(255,255,255,0.5); line-height: 1.35; }
+.tm-solves b { color: rgba(255,255,255,0.72); font-weight: 700; }
+.th-close { margin-top: 11px; width: 100%; background: none; border: 1px solid rgba(255,255,255,0.16);
+  color: rgba(255,255,255,0.55); border-radius: 9px; padding: 7px; font: inherit; font-size: 12px; cursor: pointer; }
+.th-close:hover { border-color: rgba(255,255,255,0.35); color: #fff; }
+
 #help-btn {
   position: static; flex: 0 0 auto;
   width: 30px; height: 30px; border-radius: 50%; cursor: pointer;

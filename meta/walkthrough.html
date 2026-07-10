@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meta Ray-Ban Display — Silent AR Walkthrough</title>
+<style>
+  :root{
+    --accent:#4a9eff; --neural:#4a9eff; --bci:#a35cff; --phone:#2dd4bf;
+    --ink:#eef2f7; --dim:#9aa7b6; --faint:#6b7684;
+    --glass:rgba(11,14,20,.62);
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,'SF Mono','Roboto Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:#07090c;color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;display:flex;min-height:100vh;flex-wrap:wrap;align-items:stretch}
+
+  /* ---------------- glasses view (left) ---------------- */
+  #stage{flex:1 1 560px;min-width:340px;display:flex;align-items:center;justify-content:center;padding:24px;position:relative}
+  #frame{position:relative;width:100%;max-width:760px;aspect-ratio:16/10;border-radius:18px;overflow:hidden;
+    background:#000;box-shadow:0 24px 80px #000a, inset 0 0 0 1px #ffffff12}
+  /* ambient "real world" seen through the lens */
+  #world{position:absolute;inset:0;
+    background:
+      radial-gradient(60% 45% at 72% 30%, #223247 0%, transparent 60%),
+      radial-gradient(50% 60% at 20% 80%, #1a2333 0%, transparent 65%),
+      linear-gradient(160deg,#0c1118 0%,#0a0d13 55%,#0b0f16 100%);
+    filter:brightness(.72)}
+  #world::after{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(115deg,#ffffff05 0 2px,transparent 2px 26px);opacity:.5}
+  #world .surface{position:absolute;left:0;right:0;bottom:0;height:34%;
+    background:linear-gradient(180deg,transparent,#05070b);border-top:1px solid #ffffff0c}
+
+  #topbar{position:absolute;top:14px;left:16px;z-index:6;font-size:11.5px;letter-spacing:.4px;color:#cdd6e0;
+    background:rgba(0,0,0,.4);backdrop-filter:blur(6px);padding:5px 11px;border-radius:999px;border:1px solid #ffffff14}
+  #topbar b{color:#fff;font-weight:600}
+
+  /* ---------------- corner HUD display panel ---------------- */
+  #display{position:absolute;right:18px;bottom:18px;z-index:5;width:min(46%,320px);aspect-ratio:1/1;
+    border-radius:16px;overflow:hidden;background:var(--glass);backdrop-filter:blur(16px) saturate(1.2);
+    border:1px solid #ffffff1f;box-shadow:0 14px 46px #000a, 0 0 24px #4a9eff10;
+    container-type:inline-size;transition:opacity .3s,transform .3s}
+  #display.off{opacity:0;transform:translateY(8px) scale(.98);pointer-events:none}
+  #badge{position:absolute;top:9px;right:11px;z-index:3;display:flex;align-items:center;gap:6px;
+    font-size:9.5px;font-weight:700;letter-spacing:.4px;color:#e7ecf2;background:rgba(0,0,0,.42);padding:3px 8px;border-radius:999px}
+  #badge .mk{width:11px;height:11px;border-radius:50%;
+    background:conic-gradient(from 200deg,#4dd7e0,#5b7cff,#a35cff,#ff5fa8,#4dd7e0)}
+  #dcontent{position:absolute;inset:0;padding:34px 14px 14px;display:flex;flex-direction:column;gap:9px}
+
+  .d-head{font-size:12.5px;font-weight:700;color:#cfe0ff}
+  .d-head.meta{background:linear-gradient(90deg,#5b7cff,#a35cff,#ff5fa8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .d-list{display:flex;flex-direction:column;gap:7px}
+  .d-item{position:relative;background:rgba(255,255,255,.07);border:1px solid #ffffff14;border-radius:10px;
+    padding:9px 11px;font-size:12px;color:#e7ecf2;display:flex;align-items:center;gap:8px;overflow:hidden}
+  .d-item .num{flex:none;width:17px;height:17px;border-radius:5px;background:#ffffff1a;display:grid;place-items:center;
+    font-size:10px;font-family:var(--mono);color:#b8c6d8}
+  .d-item.sel{border-color:var(--accent);background:#4a9eff22;box-shadow:0 0 0 1px var(--accent)}
+  /* SSVEP flicker fills (BCI mode) */
+  .d-item.flick::after{content:"";position:absolute;inset:0;background:var(--bci);opacity:.0;mix-blend-mode:screen}
+  .d-item.flick.f1::after{animation:fl1 .16s steps(2) infinite}
+  .d-item.flick.f2::after{animation:fl2 .12s steps(2) infinite}
+  .d-item.flick.f3::after{animation:fl3 .1s steps(2) infinite}
+  @keyframes fl1{0%{opacity:.0}50%{opacity:.30}100%{opacity:.0}}
+  @keyframes fl2{0%{opacity:.0}50%{opacity:.26}100%{opacity:.0}}
+  @keyframes fl3{0%{opacity:.0}50%{opacity:.22}100%{opacity:.0}}
+  .d-item .fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--bci);opacity:.4}
+  .d-query{margin-top:auto;display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.06);
+    border:1px solid #ffffff12;border-radius:10px;padding:8px 11px;font-size:11.5px;color:#9fb0c4}
+  .d-res{font-size:12px;color:#dbe6f2;background:rgba(255,255,255,.05);border:1px solid #ffffff12;border-radius:10px;padding:11px}
+
+  /* mini camera view inside the panel */
+  .cam{position:absolute;inset:0;background:
+      radial-gradient(50% 50% at 60% 40%,#25384f,transparent 70%),linear-gradient(160deg,#0e1620,#0a0e14);}
+  .cam .cbox{position:absolute;border:1.5px solid #ffd15a;border-radius:6px;box-shadow:0 0 0 2px #0006}
+  .cam .cbox .clab{position:absolute;top:-16px;left:-2px;font-size:9px;font-weight:700;background:#ffd15a;color:#241a02;
+    padding:1px 5px;border-radius:4px;white-space:nowrap}
+  .cam .cbox .cfill{position:absolute;inset:0;background:#ffd15a44;width:0}
+  .cam .cbox.pick{border-color:#4a9eff;box-shadow:0 0 0 2px #0006,0 0 12px #4a9eff88}
+  .cam .cbox.pick .clab{background:#4a9eff;color:#04121f}
+  .cam .ret{position:absolute;width:26px;height:26px;border:2px solid #ffffffcc;border-radius:50%;
+    transform:translate(-50%,-50%);box-shadow:0 0 8px #000a}
+  .cam .ret::after{content:"";position:absolute;inset:9px;border-radius:50%;background:#fff}
+
+  /* ---------------- phone controller ---------------- */
+  #phone{position:absolute;left:18px;bottom:18px;z-index:5;width:150px;border-radius:20px;padding:9px;
+    background:linear-gradient(160deg,#2b2e34,#131418);box-shadow:0 16px 44px #000b,inset 0 0 0 1px #ffffff10;
+    transition:opacity .3s,transform .3s}
+  #phone.hidden{opacity:0;transform:translateY(10px);pointer-events:none}
+  #phone .scr{background:#0b0d11;border-radius:13px;padding:10px;min-height:190px;display:flex;flex-direction:column;gap:7px}
+  #phone .ph-title{font-size:9px;letter-spacing:.5px;color:var(--phone);font-weight:700;text-transform:uppercase}
+  #phone .kb{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
+  #phone .kb span{height:11px;border-radius:2px;background:#20242b}
+  #phone .pads{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:2px}
+  #phone .pad{background:#23262c;border-radius:8px;padding:7px 4px;text-align:center;font-size:8.5px;font-weight:700;
+    letter-spacing:.4px;color:#c6cfda}
+  #phone .pad.wide{grid-column:1/3}
+  #phone .home{height:4px;width:40%;margin:4px auto 0;border-radius:99px;background:#ffffff2e}
+  #phone .fab{position:absolute;right:-6px;top:-6px;width:26px;height:26px;border-radius:50%;
+    background:var(--accent);display:grid;place-items:center;font-size:13px;box-shadow:0 4px 14px #4a9eff66}
+
+  /* spotlight */
+  #spot{position:absolute;z-index:7;border:2px solid #fff;border-radius:12px;pointer-events:none;
+    box-shadow:0 0 0 3px #4a9eff55,0 0 0 9999px rgba(0,0,0,.42);transition:all .28s ease}
+  #spot.hidden{display:none}
+
+  /* step-transition motion — content animates in as it "performs" */
+  @keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  #dcontent>*{animation:pop .3s ease}
+  .cam{animation:pop .3s ease}
+
+  /* ---------------- overview hub (right) ---------------- */
+  #hub{flex:1 1 320px;max-width:400px;min-width:290px;padding:30px 26px;display:flex;flex-direction:column;
+    background:#0a0d12;border-left:1px solid #ffffff10}
+  #hub .brand{font-size:12px;letter-spacing:.5px;color:var(--faint);font-family:var(--mono)}
+  #hub .brand b{color:#cdd6e0}
+  #hub h1{font-size:23px;line-height:1.22;margin:14px 0 4px;font-weight:680}
+  #hub .lead-sub{color:var(--dim);font-size:14px;margin:0 0 20px}
+  .mode-cards{display:flex;flex-direction:column;gap:12px}
+  .mode-card{text-align:left;background:#10141b;border:1px solid #ffffff14;border-radius:14px;padding:15px 16px;
+    cursor:pointer;font:inherit;color:var(--ink);transition:.15s;position:relative}
+  .mode-card:hover{border-color:var(--accent);background:#131924;transform:translateY(-1px)}
+  .mc-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .mc-name{font-size:15px;font-weight:700}
+  .mode-card.neural .mc-name{color:#9cc6ff} .mode-card.bci .mc-name{color:#c9a6ff} .mode-card.phone .mc-name{color:#8fe9dc}
+  .mc-go{margin-left:auto;font-size:12px;color:var(--faint)} .mode-card:hover .mc-go{color:var(--accent)}
+  .mc-what{font-size:13px;color:#d3dbe4;margin-bottom:8px;line-height:1.45}
+  .mc-solves{font-size:12.5px;color:var(--dim);line-height:1.45} .mc-solves b{color:#aeb9c6;font-weight:700}
+  .mode-card.seen::after{content:"✓ seen";position:absolute;top:15px;right:15px;font-size:10px;color:#34d17f;font-weight:700}
+  .mode-card.seen .mc-go{display:none}
+  .hub-foot{margin-top:auto;padding-top:20px;font-size:12px;color:var(--faint);line-height:1.5}
+  .crumb{align-self:flex-start;background:none;border:none;color:var(--faint);font:inherit;font-size:12.5px;cursor:pointer;padding:0}
+  .crumb:hover{color:var(--accent)}
+  .n-play{background:none;border-color:#ffffff22;color:var(--dim);padding:9px 13px;font-size:12.5px}
+  .n-play:hover{border-color:#ffffff44;color:#fff}
+  .n-nav{margin-left:auto;display:flex;gap:9px}
+
+  /* ---------------- narration (right) ---------------- */
+  #narr{flex:1 1 320px;max-width:400px;min-width:290px;padding:28px 26px;display:flex;flex-direction:column;
+    background:#0a0d12;border-left:1px solid #ffffff10}
+  #narr .brand{font-size:12px;letter-spacing:.5px;color:var(--faint);font-family:var(--mono)}
+  #narr .brand b{color:#cdd6e0}
+  .n-top{display:flex;align-items:center;gap:9px;margin-top:20px}
+  .n-mod{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:4px 10px;border-radius:999px;
+    background:#ffffff14;color:#cdd6e0}
+  .n-mod.neural{background:#4a9eff22;color:#9cc6ff} .n-mod.bci{background:#a35cff22;color:#c9a6ff}
+  .n-mod.phone{background:#2dd4bf22;color:#8fe9dc}
+  .n-mod.meta{background:linear-gradient(90deg,#5b7cff33,#a35cff33,#ff5fa833);color:#e7d6ff}
+  .n-count{margin-left:auto;font-size:12px;font-family:var(--mono);color:var(--faint)}
+  .n-title{font-size:22px;font-weight:680;margin:16px 0 4px;line-height:1.2}
+  .n-body{font-size:15.5px;color:#d3dbe4;margin-top:10px}
+  .n-map{margin-top:18px;display:flex;flex-direction:column;gap:8px}
+  .n-row{display:flex;gap:10px;font-size:13px;align-items:baseline}
+  .n-row .k{flex:none;width:52px;font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--faint);font-weight:700;padding-top:2px}
+  .n-row .v{color:#e7ecf2}
+  .n-row.proxy .v{font-family:var(--mono);font-size:12px;color:#9fd0ff;background:#4a9eff14;border:1px solid #4a9eff2e;border-radius:7px;padding:3px 8px}
+  .n-hint{margin-top:8px;font-size:12px;color:var(--faint)}
+  .n-foot{margin-top:auto;display:flex;align-items:center;gap:10px;padding-top:22px}
+  .n-btn{font:inherit;font-weight:700;font-size:13.5px;border-radius:11px;padding:10px 15px;cursor:pointer;border:1px solid transparent}
+  .n-next{background:var(--accent);color:#04121f}
+  .n-next:hover{filter:brightness(1.08)} .n-next:disabled{opacity:.5;cursor:default}
+  .n-back{background:none;border-color:#ffffff22;color:var(--dim)}
+  .n-back:hover{border-color:#ffffff44;color:#fff} .n-back:disabled{opacity:.35;cursor:default}
+  .n-dots{display:flex;gap:5px}
+  .n-dots i{width:6px;height:6px;border-radius:50%;background:#ffffff26}
+  .n-dots i.on{background:var(--accent)}
+
+  @media (max-width:880px){ body{flex-direction:column} #narr{max-width:none;border-left:none;border-top:1px solid #ffffff10} }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="frame">
+      <div id="world"><div class="surface"></div></div>
+      <div id="topbar"><b>Meta Ray-Ban Display</b> · glasses view — the real world</div>
+
+      <div id="display" class="off">
+        <div id="badge"><span class="mk"></span>Meta AI</div>
+        <div id="dcontent"></div>
+      </div>
+
+      <div id="phone" class="hidden">
+        <div class="fab" id="phone-fab">＋</div>
+        <div class="scr" id="phone-scr">
+          <div class="ph-title">Meta Controller</div>
+          <div id="phone-body"></div>
+        </div>
+      </div>
+
+      <div id="spot" class="hidden"></div>
+    </div>
+  </div>
+
+  <aside id="hub">
+    <div class="brand"><b>Silent AR</b></div>
+    <h1>Three ways to control AR glasses — no voice, no hands.</h1>
+    <p class="lead-sub">Pick a mode to watch it work.</p>
+    <div class="mode-cards">
+      <button class="mode-card neural" data-mode="neural">
+        <div class="mc-top"><span class="mc-name">Neural Band</span><span class="mc-go">Watch it ›</span></div>
+        <div class="mc-what">A wristband reads tiny finger-muscle signals — swipe and tap like a hidden trackpad.</div>
+        <div class="mc-solves"><b>Solves —</b> quiet control in public: no voice, no hand in the air.</div>
+      </button>
+      <button class="mode-card bci" data-mode="bci">
+        <div class="mc-top"><span class="mc-name">BCI · eyes &amp; brain</span><span class="mc-go">Watch it ›</span></div>
+        <div class="mc-what">Targets flicker at different rates; rest your gaze to pick one. A tongue press toggles it.</div>
+        <div class="mc-solves"><b>Solves —</b> fully hands-free: when your hands are busy or can’t move.</div>
+      </button>
+      <button class="mode-card phone" data-mode="phone">
+        <div class="mc-top"><span class="mc-name">Phone controller</span><span class="mc-go">Watch it ›</span></div>
+        <div class="mc-what">Your phone becomes a controller for the glasses — a keyboard plus navigation pads.</div>
+        <div class="mc-solves"><b>Solves —</b> precise typing on the go, without staring down at it.</div>
+      </button>
+    </div>
+    <div class="hub-foot">Each gesture has a keyboard/mouse stand-in — the whole thing runs with no hardware.</div>
+  </aside>
+
+  <aside id="narr">
+    <button class="crumb" id="n-over">‹ All modes</button>
+    <div class="n-top"><span class="n-mod" id="n-mod"></span><span class="n-count" id="n-count"></span></div>
+    <div class="n-title" id="n-title"></div>
+    <div class="n-body" id="n-body"></div>
+    <div class="n-map" id="n-map"></div>
+    <div class="n-foot">
+      <button class="n-btn n-play" id="n-play">❙❙ Pause</button>
+      <div class="n-dots" id="n-dots"></div>
+      <span class="n-nav"><button class="n-btn n-back" id="n-back">‹ Back</button><button class="n-btn n-next" id="n-next">Next ›</button></span>
+    </div>
+  </aside>
+
+<script>
+/* =========================================================================
+   Self-contained walkthrough of the Meta Ray-Ban Display "silent AR" concept.
+   No camera, no hardware, no server — a scripted step-through for showing the
+   interaction design. Advance with Next (or → / Space).
+   ========================================================================= */
+const disp=document.getElementById('display'), dc=document.getElementById('dcontent');
+const phone=document.getElementById('phone'), pbody=document.getElementById('phone-body');
+const spot=document.getElementById('spot'), frame=document.getElementById('frame');
+
+/* ---- corner-HUD render states ---- */
+function metaai(nav){
+  disp.classList.remove('off');
+  dc.innerHTML=`<div class="d-head meta">Meta AI</div>
+    <div class="d-list">
+      <div class="d-item">Reply to Sam — “on my way”</div>
+      <div class="d-item ${nav?'sel':''}">📷 Look at something</div>
+      <div class="d-item">What’s next on my calendar?</div>
+    </div>
+    <div class="d-query">📷&nbsp; Ask Meta AI…</div>`;
+}
+function camera(dwell){
+  disp.classList.remove('off');
+  dc.innerHTML=`<div class="cam">
+      <div class="cbox pick" style="left:14%;top:40%;width:34%;height:40%">
+        <span class="clab">coffee cup</span><span class="cfill" style="width:${dwell?100:0}%"></span></div>
+      <div class="cbox" style="left:60%;top:24%;width:30%;height:52%"><span class="clab">plant</span></div>
+      <div class="ret" style="left:31%;top:60%"></div>
+    </div>`;
+}
+function actions(bci){
+  disp.classList.remove('off');
+  const f=bci?'flick ':'';
+  dc.innerHTML=`<div class="d-head">Coffee cup</div>
+    <div class="d-list">
+      <div class="d-item ${f}f1"><span class="num">1</span>Reorder from the café</div>
+      <div class="d-item ${f}f2"><span class="num">2</span>Track caffeine today</div>
+      <div class="d-item ${f}f3"><span class="num">3</span>Set a 20-min reminder</div>
+    </div>
+    <div class="d-query">📷&nbsp; Ask about this…</div>`;
+}
+function result(){
+  disp.classList.remove('off');
+  dc.innerHTML=`<div class="d-head">Track caffeine today</div>
+    <div class="d-res">That’s your 2nd coffee — about <b>190 mg</b> so far. Logged. I’ll nudge you before 400 mg.</div>
+    <div class="d-query">📷&nbsp; Ask about this…</div>`;
+}
+function hudOff(){ disp.classList.add('off'); }
+
+/* ---- phone render ---- */
+function phoneOpen(full){
+  phone.classList.remove('hidden');
+  document.getElementById('phone-fab').style.display=full?'none':'grid';
+  pbody.innerHTML = full ? `
+    <div class="kb">${'<span></span>'.repeat(30)}</div>
+    <div class="pads">
+      <div class="pad">NAVIGATE</div><div class="pad">ZOOM</div>
+      <div class="pad wide">BACK</div>
+    </div>
+    <div class="home"></div>` : `
+    <div style="flex:1;display:grid;place-items:center;color:#5a6472;font-size:9px;letter-spacing:.5px">tap ＋ to open</div>`;
+}
+function phoneHide(){ phone.classList.add('hidden'); }
+
+/* ---- spotlight a region of the frame ---- */
+function spotlight(sel){
+  if(!sel){ spot.classList.add('hidden'); return; }
+  const el=document.querySelector(sel);
+  if(!el){ spot.classList.add('hidden'); return; }
+  const fr=frame.getBoundingClientRect(), r=el.getBoundingClientRect(), pad=6;
+  if(!r.width){ spot.classList.add('hidden'); return; }
+  spot.style.left=(r.left-fr.left-pad)+'px'; spot.style.top=(r.top-fr.top-pad)+'px';
+  spot.style.width=(r.width+pad*2)+'px'; spot.style.height=(r.height+pad*2)+'px';
+  spot.classList.remove('hidden');
+}
+
+/* ---- the three modes, each with its own auto-playing detail walkthrough ---- */
+const MODES=[
+  { id:'neural', name:'Neural Band', cls:'neural',
+    steps:[
+      { title:'Wake it with a fingertip', body:'A thumb-to-finger double-tap wakes Meta AI.',
+        real:'double-tap thumb on finger', proxy:'M', render(){ metaai(false); phoneHide(); spotlight('#display'); } },
+      { title:'Finger = trackpad', body:'Swipe to move the highlight, tap to select.',
+        real:'swipe · tap', proxy:'arrows · Enter', render(){ metaai(true); phoneHide(); spotlight('.d-item.sel'); } },
+      { title:'Point at the world', body:'The lens feed boxes objects. Aim with your head.',
+        real:'point your head', proxy:'mouse', render(){ camera(false); phoneHide(); spotlight('#display'); } },
+      { title:'Grab an object', body:'Rest the reticle, tap — the cup is now in the interface.',
+        real:'point · tap', proxy:'point + click', render(){ camera(true); spotlight('.cbox.pick'); } },
+      { title:'Actions in context', body:'Actions that fit this object — not a generic menu.',
+        render(){ actions(false); spotlight('.d-list'); } },
+      { title:'Glanceable answer', body:'It lands on the lens. The whole flow stayed silent.',
+        render(){ result(); spotlight('#display'); } },
+    ] },
+  { id:'bci', name:'BCI · eyes & brain', cls:'bci',
+    steps:[
+      { title:'Switch on with a tongue press', body:'An object is picked; the action targets start flickering.',
+        real:'long tongue press', proxy:'hold T', render(){ actions(true); phoneHide(); spotlight('.d-list'); } },
+      { title:'Choose by looking', body:'Rest your gaze on a target and a loader fills to select it — no hands.',
+        real:'gaze dwell', proxy:'keys 1–4', render(){ actions(true); spotlight('.d-list'); } },
+      { title:'Glanceable answer', body:'Selected with your eyes alone. A tongue double-tap goes back.',
+        real:'double tongue-tap = back', proxy:'double-tap T', render(){ result(); spotlight('#display'); } },
+    ] },
+  { id:'phone', name:'Phone controller', cls:'phone',
+    steps:[
+      { title:'Open the controller', body:'On the go, the phone drives the HUD. Tap the floating button.',
+        real:'tap the button', proxy:'click', render(){ hudOff(); phoneOpen(false); spotlight('#phone'); } },
+      { title:'Type & navigate, heads-up', body:'Keyboard, NAVIGATE, ZOOM, BACK — eyes still up on the world.',
+        real:'swipe · tap', proxy:'mouse', render(){ metaai(false); phoneOpen(true); spotlight('#phone'); } },
+    ] },
+];
+
+/* ---- hub (overview) + per-mode auto-playing stepper ---- */
+const hub=document.getElementById('hub'), narr=document.getElementById('narr');
+const nMod=document.getElementById('n-mod'), nCount=document.getElementById('n-count'),
+  nTitle=document.getElementById('n-title'), nBody=document.getElementById('n-body'),
+  nMap=document.getElementById('n-map'), nDots=document.getElementById('n-dots'),
+  nBack=document.getElementById('n-back'), nNext=document.getElementById('n-next'),
+  nOver=document.getElementById('n-over'), nPlay=document.getElementById('n-play');
+let mi=-1, i=0, auto=false, timer=null; const seen=new Set();
+const DELAY=2600;                                        // ms each step holds while auto-playing
+
+function showHub(){
+  stopAuto(); mi=-1; hub.style.display='flex'; narr.style.display='none';
+  hudOff(); phoneHide(); spotlight(null);
+  document.querySelectorAll('.mode-card').forEach(c=>c.classList.toggle('seen', seen.has(c.dataset.mode)));
+}
+function enterMode(id){
+  mi=MODES.findIndex(m=>m.id===id); if(mi<0)return; i=0; seen.add(id);
+  hub.style.display='none'; narr.style.display='flex';
+  nDots.innerHTML=MODES[mi].steps.map(()=>'<i></i>').join('');
+  render(); startAuto();                                 // plays itself; no keypresses needed
+}
+function render(){
+  const M=MODES[mi], s=M.steps[i];
+  s.render(); requestAnimationFrame(()=>s.render());      // re-place spotlight after layout settles
+  nMod.textContent=M.name; nMod.className='n-mod '+M.cls;
+  nCount.textContent=(i+1)+' / '+M.steps.length;
+  nTitle.textContent=s.title; nBody.innerHTML=s.body;
+  nMap.innerHTML=(s.real||s.proxy)?`<div class="n-row"><span class="k">You do</span><span class="v">${s.real||'—'}</span></div><div class="n-row proxy"><span class="k">Demo key</span><span class="v">${s.proxy||'—'}</span></div>`:'';
+  [...nDots.children].forEach((d,k)=>d.classList.toggle('on',k<=i));
+  nBack.disabled=i===0;
+  nNext.textContent=i===M.steps.length-1?'Done ✓':'Next ›';
+  updatePlay();
+}
+const atEnd=()=>i>=MODES[mi].steps.length-1;
+function schedule(){ clearTimeout(timer); if(!auto||mi<0) return;
+  timer=setTimeout(()=>{ if(atEnd()) stopAuto(); else { i++; render(); schedule(); } }, DELAY); }
+function startAuto(){ auto=true; updatePlay(); schedule(); }
+function stopAuto(){ auto=false; clearTimeout(timer); updatePlay(); }
+function updatePlay(){ if(nPlay) nPlay.textContent = auto ? '❙❙ Pause' : (mi>=0&&atEnd() ? '↻ Replay' : '▶ Play'); }
+
+function next(){ if(mi<0)return; stopAuto(); if(atEnd()) showHub(); else { i++; render(); } }
+function back(){ if(mi<0)return; stopAuto(); if(i>0){ i--; render(); } }
+function togglePlay(){ if(mi<0)return; if(auto) stopAuto(); else { if(atEnd()){ i=0; render(); } startAuto(); } }
+
+document.querySelectorAll('.mode-card').forEach(c=>c.addEventListener('click',()=>enterMode(c.dataset.mode)));
+nNext.addEventListener('click',next);
+nBack.addEventListener('click',back);
+nOver.addEventListener('click',showHub);
+nPlay.addEventListener('click',togglePlay);
+document.addEventListener('keydown',e=>{
+  if(mi<0) return;
+  if(e.key==='ArrowRight'){ e.preventDefault(); next(); }
+  else if(e.key==='ArrowLeft'){ e.preventDefault(); back(); }
+  else if(e.key===' '){ e.preventDefault(); togglePlay(); }
+  else if(e.key==='Escape'){ showHub(); }
+});
+window.addEventListener('resize',()=>{ if(mi>=0) MODES[mi].steps[i].render(); });
+showHub();
+</script>
+</body>
+</html>

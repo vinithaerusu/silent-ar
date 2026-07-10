@@ -775,10 +775,15 @@ const TOUR = [
     body: "Select an object from the camera feed, and Meta AI gives you three suggested actions — curated from what it is, your habits, what the camera sees around you, and the time of day.",
     real: "", proxy: "",
     enter: () => { setMode("neural"); tourMenu(); } },
-  // Step 7 — the BCI/EMG modality (SSVEP flicker + dwell/number to select)
-  { mod: "BCI/EMG", title: "", spot: null,
-    body: "Toggle BCI/EMG mode on and off with a long press of your tongue to the roof of your mouth. The selectable options now flicker at different frequencies — rest your gaze on one and a loader fills to select it. Double-tap your tongue to go back a page. As keyboard proxies: hold T to toggle, press an option's number to fill the loader, and double-tap T to go back.",
-    real: "long tongue-press · gaze dwell · double tongue-tap", proxy: "hold T · keys 1–4 · double-tap T",
+  // BCI/EMG — 1) toggle on, then pick an object in the camera view by dwell (no tap)
+  { mod: "BCI/EMG", title: "", spot: "#display",
+    body: "Switch to BCI/EMG with a long tongue-press to the roof of your mouth. To pick an object in the camera view, point your head at it and simply rest your gaze — a loader fills on the box and selects it. No tap, no hands.",
+    real: "long tongue-press · point head · hold gaze (dwell)", proxy: "hold T · point + hold to dwell",
+    enter: () => { setMode("bci"); openCamera(); } },
+  // BCI/EMG — 2) the action menu: options flicker (SSVEP), gaze-dwell to select, tongue double-tap = back
+  { mod: "BCI/EMG", title: "", spot: ".opt-list",
+    body: "In a menu the options flicker at different frequencies — rest your gaze on one and its loader fills to choose it. Double-tap your tongue to go back a page. As keyboard proxies: keys 1–4 fill a loader, double-tap T goes back.",
+    real: "gaze dwell · double tongue-tap", proxy: "keys 1–4 · double-tap T",
     enter: () => { setMode("bci"); tourMenu(); } },
   // --- Phone (Meta Controller) steps — cards + spotlights render over the phone via the parent ---
   // Step 8 — open the Meta Controller
@@ -791,10 +796,10 @@ const TOUR = [
     body: "Touch the keyboard to activate it, then swipe across letters to glide-type or tap to type. For a precise single key, touch and drag within the keys to hover it, and tap to select.",
     real: "tap · swipe · drag-hover + tap", proxy: "mouse — same gestures",
     enter: () => { setMode("neural"); openMetaAI(); } },
-  // Step 10 — close the controller (swipe up the home bar; tapping outside just dismisses the keyboard)
-  { mod: "Phone", device: "phone", spot: "#navpill", needsController: true,
-    body: "Swipe up from the home bar to close the controller and return home. Tapping anywhere outside the keyboard dismisses just the keyboard — on the HUD too.",
-    real: "swipe up the home bar", proxy: "mouse drag up",
+  // Step 9b — close the HUD keyboard by clicking anywhere outside the controller
+  { mod: "Phone", device: "phone", spot: "@above-controller", needsController: true,
+    body: "Click anywhere outside the Meta Controller to close the keyboard. The two screens stay in sync, so it closes on the HUD too.",
+    real: "tap anywhere outside the controller", proxy: "click anywhere outside",
     enter: () => { setMode("neural"); openMetaAI(); } },
   // Step 11 — ZOOM
   { mod: "Phone", device: "phone", spot: "#zoom-btn", needsController: true,
@@ -811,23 +816,63 @@ const TOUR = [
     body: "Tap the BACK button to go back a page.",
     real: "tap", proxy: "mouse click",
     enter: () => { setMode("neural"); openMetaAI(); } },
+  // Step 14 — close the controller (swipe up the home bar) — last step in the phone mode
+  { mod: "Phone", device: "phone", spot: "#navpill", needsController: true,
+    body: "Swipe up from the home bar to close the controller and return home.",
+    real: "swipe up the home bar", proxy: "mouse drag up",
+    enter: () => { setMode("neural"); openMetaAI(); } },
 ];
 let tourIdx = 0, tourActive = false, tourSpotSel = null;
-function tourStart() { tourActive = true; tourIdx = 0; const b = document.getElementById("tour-btn"); if (b) b.style.display = "none"; document.getElementById("tour").classList.remove("hidden"); tourRender(); requestAnimationFrame(tourSpotTick); }
-function tourFinish(keep) {                        // keep=true leaves the last step's result on screen; false = back to blank
-  tourActive = false; document.getElementById("tour").classList.add("hidden"); tourSpot(null);
-  try { window.parent.__tourPhoneHide(); } catch (_) {}   // clear the phone overlay if the tour ended on a phone step
+let tourGroup = null, groupIdxs = [], groupPos = 0;
+// the three input modalities shown on the hub; each walks its own subset of TOUR steps
+const GROUPS = [
+  { id: "neural", name: "Neural Band", desc: "Subtle finger gestures on a wristband — a hidden trackpad.", solves: "Quiet control in public — no voice, no hands up." },
+  { id: "bci", name: "BCI · eyes & brain", desc: "Flickering targets you pick with your gaze; tongue toggles it.", solves: "Fully hands-free — hands busy or can’t move." },
+  { id: "phone", name: "Phone controller", desc: "Your phone becomes a keyboard + navigation pads.", solves: "Precise typing on the go, eyes up." },
+];
+const stepGroup = (s) => s.mod === "Phone" ? "phone" : (s.mod === "BCI/EMG" ? "bci" : "neural");
+
+function tourStart() { tourActive = true; const b = document.getElementById("tour-btn"); if (b) b.style.display = "none"; tourShowHub(); requestAnimationFrame(tourSpotTick); }
+function tourFinish(keep) {                        // exit the tour entirely (Skip / Close / Done)
+  tourActive = false; document.getElementById("tour").classList.add("hidden");
+  const hub = document.getElementById("tour-hub"); if (hub) hub.classList.add("hidden");
+  tourSpot(null);
+  try { window.parent.__tourPhoneHide(); } catch (_) {}
   const b = document.getElementById("tour-btn"); if (b) b.style.display = "";
   if (!keep) { setMode("neural"); show("off"); }
 }
-function tourEnd() { tourFinish(false); }         // Skip -> abort back to the blank default
-function tourNext() { if (tourIdx >= TOUR.length - 1) return tourFinish(true); tourIdx++; tourRender(); }
-function tourPrev() { if (tourIdx > 0) { tourIdx--; tourRender(); } }
+function tourEnd() { tourFinish(false); }         // Skip / Close -> exit
+
+// ---- mode hub: briefly present the three modalities; pick one to walk its steps ----
+function renderHub() {
+  const wrap = document.querySelector("#tour-hub .th-modes"); if (!wrap) return;
+  wrap.innerHTML = GROUPS.map((g) =>
+    `<button class="th-mode" data-group="${g.id}"><div class="tm-top"><span class="tm-name">${g.name}</span><span class="tm-arrow">›</span></div>` +
+    `<div class="tm-desc">${g.desc}</div><div class="tm-solves"><b>Solves</b> — ${g.solves}</div></button>`).join("");
+  wrap.querySelectorAll(".th-mode").forEach((b) => b.addEventListener("click", () => tourEnterGroup(b.dataset.group)));
+}
+function tourShowHub() {
+  tourGroup = null; groupIdxs = []; groupPos = 0;
+  document.getElementById("tour").classList.add("hidden"); tourSpot(null);
+  try { window.parent.__tourPhoneHide(); } catch (_) {}
+  setMode("neural"); show("off");
+  renderHub();
+  const hub = document.getElementById("tour-hub"); if (hub) hub.classList.remove("hidden");
+}
+function tourEnterGroup(id) {
+  groupIdxs = TOUR.map((s, idx) => idx).filter((idx) => stepGroup(TOUR[idx]) === id);
+  if (!groupIdxs.length) return;
+  tourGroup = id; groupPos = 0; tourIdx = groupIdxs[0];
+  const hub = document.getElementById("tour-hub"); if (hub) hub.classList.add("hidden");
+  tourRender();
+}
+function tourNext() { if (groupPos >= groupIdxs.length - 1) return tourShowHub(); groupPos++; tourIdx = groupIdxs[groupPos]; tourRender(); }   // end of a mode -> back to the hub
+function tourPrev() { if (groupPos <= 0) return tourShowHub(); groupPos--; tourIdx = groupIdxs[groupPos]; tourRender(); }
 // an in-world action (real gesture proxy) satisfied the current step -> advance
 function tourComplete(action) { if (tourActive && TOUR[tourIdx] && TOUR[tourIdx].await === action) tourNext(); }
 function tourPhoneData(s) {   // payload the parent uses to render the card + spotlight over the phone
   return { mod: s.mod, body: s.body, real: s.real, proxy: s.proxy, spot: s.spot, needsController: s.needsController,
-           idx: tourIdx, total: TOUR.length, canPrev: tourIdx > 0, isLast: tourIdx === TOUR.length - 1 };
+           idx: groupPos, total: groupIdxs.length, canPrev: true, isLast: groupPos === groupIdxs.length - 1 };
 }
 function tourRender() {
   const s = TOUR[tourIdx], el = document.getElementById("tour");
@@ -840,14 +885,14 @@ function tourRender() {
   try { window.parent.__tourPhoneHide(); } catch (_) {}   // HUD step: make sure the phone overlay is gone
   el.classList.remove("hidden");
   const mod = el.querySelector(".tour-mod"); mod.textContent = s.mod || ""; mod.classList.toggle("hidden", !s.mod);
-  el.querySelector(".tour-count").textContent = (tourIdx + 1) + " / " + TOUR.length;
+  el.querySelector(".tour-count").textContent = (groupPos + 1) + " / " + groupIdxs.length;
   const title = el.querySelector(".tour-title"); title.textContent = s.title || ""; title.classList.toggle("hidden", !s.title);
   el.querySelector(".tour-body").textContent = s.body;
   const map = el.querySelector(".tour-map"), hasMap = !!(s.real || s.proxy);   // hide the Real/Proxy rows when the step has none
   map.classList.toggle("hidden", !hasMap);
   if (hasMap) { el.querySelector(".tour-real").textContent = s.real || "—"; el.querySelector(".tour-proxy").textContent = s.proxy || "—"; }
-  el.querySelector(".tour-prev").disabled = tourIdx === 0;
-  el.querySelector(".tour-next").textContent = tourIdx === TOUR.length - 1 ? "Done ✓" : "Next ›";
+  const prev = el.querySelector(".tour-prev"); prev.disabled = false; prev.textContent = groupPos === 0 ? "‹ Modes" : "‹ Back";
+  el.querySelector(".tour-next").textContent = groupPos === groupIdxs.length - 1 ? "Done ✓" : "Next ›";
   tourSpot(s.spot);   // debounced — positions after the view lays out
 }
 function tourSpot(sel) {                                           // set the current step's spotlight target
@@ -890,6 +935,9 @@ function tourMenu() {   // open an action card reliably, even before a live dete
   });
   el.querySelector(".tour-prev").addEventListener("click", tourPrev);
   el.querySelector(".tour-skip").addEventListener("click", tourEnd);
+  const hub = document.getElementById("tour-hub");
+  if (hub) { const cl = hub.querySelector(".th-close"); if (cl) cl.addEventListener("click", () => tourFinish(false)); }
 })();
 
 init();   // start after every top-level declaration is initialized (avoids TDZ on street state)
+tourStart();   // open the mode hub by default on load
