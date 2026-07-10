@@ -200,6 +200,56 @@ body.hud-page {
 #feed-toggle .ic svg { width: 100%; height: 100%; }
 #feed-toggle:hover { background: rgba(255,255,255,0.12); color: #fff; }
 #feed-toggle.on { border-color: rgba(255,255,255,0.6); color: #fff; background: rgba(255,255,255,0.16); }
+
+/* ===== Guided walkthrough (tour) ===== */
+#tour-btn {
+  flex: 0 0 auto; cursor: pointer; height: 30px; padding: 0 14px; border-radius: 15px;
+  border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.9); font: 600 12px system-ui; letter-spacing: 0.2px;
+}
+#tour-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+#tour { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
+#tour-spot {   /* bright white ring pinned to the current step's target */
+  position: absolute; border: 2.5px solid #fff; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.35), 0 0 20px rgba(255,255,255,0.75);
+  animation: tour-pulse 1.4s ease-in-out infinite;   /* no position transition — the pin loop tracks the target directly */
+}
+@keyframes tour-pulse { 0%,100% { box-shadow: 0 0 0 3px rgba(0,0,0,0.35), 0 0 16px rgba(255,255,255,0.6); } 50% { box-shadow: 0 0 0 4px rgba(0,0,0,0.4), 0 0 30px rgba(255,255,255,0.95); } }
+.tour-card {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  width: min(360px, 68%); pointer-events: auto;
+  background: rgba(14,17,22,0.94); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px;
+  padding: 14px 16px 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.6); color: #eef1f6;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+.tour-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.tour-mod {
+  font: 700 10px system-ui; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #e8eaed; background: rgba(255,255,255,0.14); padding: 3px 8px; border-radius: 999px;
+}
+.tour-mod:empty { display: none; }
+.tour-count { font: 600 11px system-ui; color: rgba(255,255,255,0.5); }
+.tour-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.tour-title:empty { display: none; }
+.tour-body { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.82); }
+.tour-map { margin: 11px 0 12px; display: flex; flex-direction: column; gap: 6px; }
+.tour-map.hidden { display: none; }
+.tour-row { display: flex; align-items: baseline; gap: 10px; font-size: 12.5px; }
+.tour-row .tl { flex: 0 0 42px; font: 700 10px system-ui; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,0.45); }
+.tour-real { color: rgba(255,255,255,0.72); font-style: italic; }
+.tour-proxy { color: #fff; font-weight: 600; }
+.tour-btns { display: flex; align-items: center; justify-content: space-between; }
+.tour-btns button {
+  cursor: pointer; border-radius: 9px; font: 600 12px system-ui; padding: 7px 12px;
+  border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #e8eaed;
+}
+.tour-nav { display: inline-flex; gap: 8px; }
+.tour-skip { color: rgba(255,255,255,0.55) !important; }
+.tour-next { background: #fff !important; border-color: transparent !important; color: #14171d !important; }
+.tour-btns button:hover { filter: brightness(1.15); }
+.tour-next:hover { filter: brightness(0.92); }
+.tour-prev:disabled { opacity: 0.35; cursor: default; }
+
 #help-panel {
   position: absolute; left: 0; top: calc(100% + 10px); z-index: 7; max-width: 360px;
   background: rgba(18,20,26,0.96); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px;
@@ -387,10 +437,10 @@ body.phone-page #conn.on { color: #81c995; }
 .kb-key--punct { flex: 0.8; }
 .kb-key.hover, .kb-key.hl { background: var(--accent); color: #fff; }   /* demo hover highlight */
 
-#kb-wrap { position: relative; }
-#kb-trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
-#kb-trail polyline {
-  fill: none; stroke: rgba(66,133,244,0.55); stroke-width: 8;   /* Gboard blue glide ribbon */
+#kb-wrap, #hud-kb-wrap { position: relative; }
+#kb-trail, #hud-kb-trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+#kb-trail polyline, #hud-kb-trail polyline {
+  fill: none; stroke: rgba(66,133,244,0.65); stroke-width: 7;   /* Gboard blue glide ribbon */
   stroke-linecap: round; stroke-linejoin: round;
 }
 

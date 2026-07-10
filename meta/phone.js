@@ -66,11 +66,11 @@ if (phoneHelpBtn) phoneHelpBtn.addEventListener("click", () => {
   phoneHelp.classList.toggle("hidden"); phoneHelpBtn.classList.toggle("on");
 });
 
-// ---- tap anywhere outside the controller -> close it (also dismisses the HUD keyboard) ----
+// ---- tap anywhere outside the keyboard -> dismiss just the HUD keyboard (the controller stays open; swipe up the home bar to close it) ----
 document.addEventListener("pointerdown", (e) => {
   if (e.target.closest(".kb-panel") || e.target.closest(".ctrl-row") || e.target.closest("#float-icon") ||
       e.target.closest("#phone-help-btn") || e.target.closest("#phone-help") || e.target.closest("#navpill")) return;
-  closeController();
+  if (hudKb) { hudKb = false; Sync.send("keyboard:close"); }
 });
 
 // ---- keyboard: tap = type, swipe = glide-type, drag-in-key = nothing ----
@@ -127,8 +127,12 @@ function press(k) {
   else Sync.send("key:hover", { key: null });
 }
 function clearPress() { if (pressed) { pressed.classList.remove("hover"); pressed = null; } }
-function drawTrail() { trail.innerHTML = `<polyline points="${points.map((p) => p.join(",")).join(" ")}"/>`; }
-function clearTrail() { points = []; trail.innerHTML = ""; }
+function drawTrail() {
+  trail.innerHTML = `<polyline points="${points.map((p) => p.join(",")).join(" ")}"/>`;
+  const r = kbWrap.getBoundingClientRect();   // mirror the swipe line onto the HUD keyboard (normalized 0–1)
+  Sync.send("trail:set", { pts: points.map((p) => [+(p[0] / r.width).toFixed(4), +(p[1] / r.height).toFixed(4)]) });
+}
+function clearTrail() { points = []; trail.innerHTML = ""; Sync.send("trail:set", { pts: [] }); }
 
 // ---- text ----
 function applyKey(k) {

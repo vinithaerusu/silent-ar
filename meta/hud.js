@@ -23,6 +23,8 @@ const kbview     = document.getElementById("kbview");
 const textline   = document.getElementById("textline");
 const caret      = document.getElementById("caret");
 const hudKb      = document.getElementById("hud-kb");
+const hudKbWrap  = document.getElementById("hud-kb-wrap");
+const hudTrail   = document.getElementById("hud-kb-trail");
 const hudSuggest = document.getElementById("hud-suggest");
 const resultEl   = document.getElementById("result");
 const display    = document.getElementById("display");
@@ -709,6 +711,13 @@ function highlight(key) {
   hudKb.querySelectorAll(".kb-key.hl").forEach((n) => n.classList.remove("hl"));
   if (key) { const el = hudKb.querySelector(`.kb-key[data-key="${key}"]`); if (el) el.classList.add("hl"); }
 }
+// mirror the phone's glide swipe line onto the HUD keyboard (pts are normalized 0–1 of the keyboard box)
+function drawHudTrail(pts) {
+  if (!pts || !pts.length) { hudTrail.innerHTML = ""; return; }
+  const w = hudKbWrap.offsetWidth, h = hudKbWrap.offsetHeight;
+  const s = pts.map((p) => (p[0] * w).toFixed(1) + "," + (p[1] * h).toFixed(1)).join(" ");
+  hudTrail.innerHTML = `<polyline points="${s}"/>`;
+}
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 // ---- sync ----
@@ -726,6 +735,7 @@ Sync.on((m) => {
     case "text:set":    setQuery(m.text); break;
     case "suggest:set": if (stage === "keyboard") renderSuggest(hudSuggest, m.words); break;
     case "key:hover":   if (stage === "keyboard") highlight(m.key); break;
+    case "trail:set":   if (stage === "keyboard") drawHudTrail(m.pts); break;   // mirror the glide swipe line
   }
 });
 Sync.send("hello");
@@ -781,10 +791,10 @@ const TOUR = [
     body: "Touch the keyboard to activate it, then swipe across letters to glide-type or tap to type. For a precise single key, touch and drag within the keys to hover it, and tap to select.",
     real: "tap · swipe · drag-hover + tap", proxy: "mouse — same gestures",
     enter: () => { setMode("neural"); openMetaAI(); } },
-  // Step 10 — close the keyboard / controller (card sits above the controller)
-  { mod: "Phone", device: "phone", spot: "@above-controller", needsController: true,
-    body: "Tap anywhere outside the meta controller to close it — it dismisses on the HUD too.",
-    real: "tap outside", proxy: "mouse click outside",
+  // Step 10 — close the controller (swipe up the home bar; tapping outside just dismisses the keyboard)
+  { mod: "Phone", device: "phone", spot: "#navpill", needsController: true,
+    body: "Swipe up from the home bar to close the controller and return home. Tapping anywhere outside the keyboard dismisses just the keyboard — on the HUD too.",
+    real: "swipe up the home bar", proxy: "mouse drag up",
     enter: () => { setMode("neural"); openMetaAI(); } },
   // Step 11 — ZOOM
   { mod: "Phone", device: "phone", spot: "#zoom-btn", needsController: true,

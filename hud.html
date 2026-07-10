@@ -16,6 +16,7 @@
     <div id="hud-controls">
       <button id="help-btn" title="Controls (?)">?</button>
       <button id="feed-toggle" title="Switch world feed: live webcam ↔ street demo"></button>
+      <button id="tour-btn" title="Guided walkthrough">▸ Guided tour</button>
       <div id="help-panel" class="hidden">
         <div class="help-title">Controls</div>
         <div class="help-grid">
@@ -69,7 +70,10 @@
         <div id="textline"><span id="caret"></span></div>
         <div class="kb-panel">
           <div id="hud-suggest" class="kb-suggest"></div>
-          <div id="hud-kb" class="kb"></div>
+          <div id="hud-kb-wrap">
+            <div id="hud-kb" class="kb"></div>
+            <svg id="hud-kb-trail"></svg>            <!-- mirrors the phone's glide swipe line -->
+          </div>
         </div>
       </div>
 
@@ -86,6 +90,24 @@
         </div>
       </div>
     </div></div>
+
+    <!-- guided walkthrough overlay — floats over the live HUD -->
+    <div id="tour" class="hidden">
+      <div id="tour-spot" class="hidden"></div>
+      <div class="tour-card">
+        <div class="tour-top"><span class="tour-mod"></span><span class="tour-count"></span></div>
+        <div class="tour-title"></div>
+        <div class="tour-body"></div>
+        <div class="tour-map">
+          <div class="tour-row"><span class="tl">Real</span><span class="tour-real"></span></div>
+          <div class="tour-row"><span class="tl">Proxy</span><span class="tour-proxy"></span></div>
+        </div>
+        <div class="tour-btns">
+          <button class="tour-skip">Skip</button>
+          <span class="tour-nav"><button class="tour-prev">‹ Back</button><button class="tour-next">Next ›</button></span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="sync.js"></script>

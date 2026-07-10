@@ -42,6 +42,23 @@ floatIcon.addEventListener("click", () => {
   surface.classList.remove("hidden");
 });
 
+// ---- close the controller: back to the phone home (and dismiss the HUD keyboard) ----
+function closeController() {
+  if (surface.classList.contains("hidden")) return;
+  surface.classList.add("hidden");
+  floatIcon.classList.remove("hidden");
+  if (hudKb) { hudKb = false; Sync.send("keyboard:close"); }
+}
+
+// ---- Pixel-style home gesture: swipe up on the nav pill to close the controller ----
+const navpill = document.getElementById("navpill");
+if (navpill) {
+  navpill.style.cursor = "grab"; navpill.style.touchAction = "none";
+  let npY = null;
+  navpill.addEventListener("pointerdown", (e) => { npY = e.clientY; try { navpill.setPointerCapture(e.pointerId); } catch (_) {} });
+  navpill.addEventListener("pointerup", (e) => { if (npY != null && npY - e.clientY > 22) closeController(); npY = null; });   // swiped up -> home
+}
+
 // ---- controls cheat-sheet toggle ("?" on the surface) ----
 const phoneHelpBtn = document.getElementById("phone-help-btn");
 const phoneHelp = document.getElementById("phone-help");
@@ -49,10 +66,10 @@ if (phoneHelpBtn) phoneHelpBtn.addEventListener("click", () => {
   phoneHelp.classList.toggle("hidden"); phoneHelpBtn.classList.toggle("on");
 });
 
-// ---- tap anywhere outside the keyboard / buttons -> close the keyboard on the HUD ----
+// ---- tap anywhere outside the keyboard -> dismiss just the HUD keyboard (the controller stays open; swipe up the home bar to close it) ----
 document.addEventListener("pointerdown", (e) => {
   if (e.target.closest(".kb-panel") || e.target.closest(".ctrl-row") || e.target.closest("#float-icon") ||
-      e.target.closest("#phone-help-btn") || e.target.closest("#phone-help")) return;
+      e.target.closest("#phone-help-btn") || e.target.closest("#phone-help") || e.target.closest("#navpill")) return;
   if (hudKb) { hudKb = false; Sync.send("keyboard:close"); }
 });
 
@@ -103,8 +120,12 @@ function press(k) {
   else Sync.send("key:hover", { key: null });
 }
 function clearPress() { if (pressed) { pressed.classList.remove("hover"); pressed = null; } }
-function drawTrail() { trail.innerHTML = `<polyline points="${points.map((p) => p.join(",")).join(" ")}"/>`; }
-function clearTrail() { points = []; trail.innerHTML = ""; }
+function drawTrail() {
+  trail.innerHTML = `<polyline points="${points.map((p) => p.join(",")).join(" ")}"/>`;
+  const r = kbWrap.getBoundingClientRect();   // mirror the swipe line onto the HUD keyboard (normalized 0–1)
+  Sync.send("trail:set", { pts: points.map((p) => [+(p[0] / r.width).toFixed(4), +(p[1] / r.height).toFixed(4)]) });
+}
+function clearTrail() { points = []; trail.innerHTML = ""; Sync.send("trail:set", { pts: [] }); }
 
 // ---- text ----
 function applyKey(k) {

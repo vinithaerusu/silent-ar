@@ -26,6 +26,8 @@ const kbview     = document.getElementById("kbview");
 const textline   = document.getElementById("textline");
 const caret      = document.getElementById("caret");
 const hudKb      = document.getElementById("hud-kb");
+const hudKbWrap  = document.getElementById("hud-kb-wrap");
+const hudTrail   = document.getElementById("hud-kb-trail");
 const hudSuggest = document.getElementById("hud-suggest");
 const resultEl   = document.getElementById("result");
 const panel      = document.getElementById("panel");
@@ -436,7 +438,7 @@ function show(st) {
   kbview.classList.toggle("hidden", st !== "keyboard");
   resultEl.classList.toggle("hidden", st !== "result");
   chatEl.classList.toggle("hidden", st !== "chat");
-  hudChrome.classList.toggle("hidden", st === "browse");   // hide the Snap AI header in CV detection (no card there)
+  hudChrome.classList.toggle("hidden", st === "browse" || st === "off");   // hide the Snap AI header in CV detection / the blank "off" state
   Sync.send("hudkb", { open: st === "keyboard" });   // tell the phone whether its keyboard is live on the HUD
 }
 
@@ -569,6 +571,7 @@ function openMetaAI() {
   metaAI = true; chat = []; query = "";
   chatIdx = DEFAULTS.length; chatSub = "input";     // default focus: the text input
   renderChat(); show("chat");
+  tourComplete("snapai");                           // enabling Snap AI satisfies the walkthrough's "enable" step
 }
 function renderChat() {
   chatThread.innerHTML = chat.map((m) => `<div class="msg ${m.role}">${escapeHtml(m.text)}</div>`).join("");
@@ -644,7 +647,7 @@ function bciKey(e) {
   if (e.key === "x" || e.key === "X") return zoom(-1);
 }
 let lastTap = 0;
-function tongueDown(e) { if (e.repeat) return; }   // tongue press — the double-tap (below) is the back gesture
+function tongueDown(e) { if (e.repeat) return; if (stage === "off") openMetaAI(); }   // tongue press: enables Snap AI from the blank state; double-tap (below) is back
 function onKeyUp(e) {
   if (e.key === "t" || e.key === "T") {
     const now = performance.now();
@@ -692,6 +695,13 @@ function highlight(key) {
   hudKb.querySelectorAll(".kb-key.hl").forEach((n) => n.classList.remove("hl"));
   if (key) { const el = hudKb.querySelector(`.kb-key[data-key="${key}"]`); if (el) el.classList.add("hl"); }
 }
+// mirror the phone's glide swipe line onto the HUD keyboard (pts are normalized 0–1 of the keyboard box)
+function drawHudTrail(pts) {
+  if (!pts || !pts.length) { hudTrail.innerHTML = ""; return; }
+  const w = hudKbWrap.offsetWidth, h = hudKbWrap.offsetHeight;
+  const s = pts.map((p) => (p[0] * w).toFixed(1) + "," + (p[1] * h).toFixed(1)).join(" ");
+  hudTrail.innerHTML = `<polyline points="${s}"/>`;
+}
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
 // ---- sync ----
@@ -709,8 +719,155 @@ Sync.on((m) => {
     case "text:set":    setQuery(m.text); break;
     case "suggest:set": if (stage === "keyboard") renderSuggest(hudSuggest, m.words); break;
     case "key:hover":   if (stage === "keyboard") highlight(m.key); break;
+    case "trail:set":   if (stage === "keyboard") drawHudTrail(m.pts); break;   // mirror the glide swipe line
   }
 });
 Sync.send("hello");
+
+// ================= Guided walkthrough (tour) — Snap Spectacles: BCI + phone =================
+const TOUR = [
+  // Step 1 — enable Snap AI (BCI/EMG tongue press) — display starts blank
+  { mod: "BCI/EMG", title: "", spot: null,
+    body: "Press your tongue against the roof of your mouth to enable Snap AI in BCI/EMG mode.",
+    real: "tongue press", proxy: "press T",
+    enter: () => show("off"),
+    await: "snapai", do: () => openMetaAI() },
+  // Step 2 — Snap AI home + suggestions
+  { mod: "Snap AI", title: "", spot: ".chat-defaults",
+    body: "Snap AI is your home surface — three suggestions curated for the moment, from your habits, what the camera sees around you, and the time of day.",
+    real: "", proxy: "",
+    enter: () => openMetaAI() },
+  // Step 3 — select a suggestion (BCI, hands-free)
+  { mod: "BCI", title: "", spot: ".chat-defaults",
+    body: "Hands-free, the options flicker at different frequencies — rest your gaze on one and a loader fills to select it. As a proxy, press the option's number on the keyboard.",
+    real: "gaze dwell on a flickering option", proxy: "keys 1–4",
+    enter: () => openMetaAI() },
+  // Step 4 — the camera option
+  { mod: "Snap AI", title: "", spot: "#chat-cam",
+    body: "Snap AI provides a camera option to select an object from the camera feed to use in your query.",
+    real: "", proxy: "",
+    enter: () => openMetaAI() },
+  // Step 5 — the camera view (head-aim + dwell)
+  { mod: "BCI", title: "", spot: null,
+    body: "Look at the world through your glasses. Point your head to focus on an object, and hold your gaze — a dwell timer selects it. As a proxy, point with your mouse and hold.",
+    real: "point head · hold gaze (dwell)", proxy: "mouse point + hold",
+    enter: () => openCamera() },
+  // Step 6 — the object's suggested actions
+  { mod: "Snap AI", title: "", spot: ".opt-list",
+    body: "Select an object from the camera feed, and Snap AI gives you three suggested actions — curated from what it is, your habits, what the camera sees around you, and the time of day.",
+    real: "", proxy: "",
+    enter: () => tourMenu() },
+  // Step 7 — go back (BCI tongue)
+  { mod: "BCI", title: "", spot: null,
+    body: "Double-tap your tongue to the roof of your mouth to go back a page. As a proxy, double-tap T on the keyboard.",
+    real: "double tongue-tap", proxy: "double-tap T",
+    enter: () => tourMenu() },
+  // --- Phone (Snap Controller) steps — cards + spotlights render over the phone via the parent ---
+  // Step 8 — open the Snap Controller
+  { mod: "Phone", device: "phone", spot: "#float-icon", needsController: false,
+    body: "On the go, your phone doubles as a controller for the glasses — type and navigate the HUD while staying heads-up. Press the floating button to open the Snap Controller.",
+    real: "tap the floating button", proxy: "mouse click",
+    enter: () => openMetaAI() },
+  // Step 9 — the keyboard
+  { mod: "Phone", device: "phone", spot: "#phone-kb", needsController: true,
+    body: "Touch the keyboard to activate it, then swipe across letters to glide-type or tap to type. For a precise single key, touch and drag within the keys to hover it, and tap to select.",
+    real: "tap · swipe · drag-hover + tap", proxy: "mouse — same gestures",
+    enter: () => openMetaAI() },
+  // Step 10 — close the controller (swipe up the home bar; tapping outside just dismisses the keyboard)
+  { mod: "Phone", device: "phone", spot: "#navpill", needsController: true,
+    body: "Swipe up from the home bar to close the controller and return home. Tapping anywhere outside the keyboard dismisses just the keyboard — on the HUD too.",
+    real: "swipe up the home bar", proxy: "mouse drag up",
+    enter: () => openMetaAI() },
+  // Step 11 — ZOOM
+  { mod: "Phone", device: "phone", spot: "#zoom-btn", needsController: true,
+    body: "Swipe up or down on the ZOOM button to zoom in and out on the HUD.",
+    real: "swipe up / down", proxy: "mouse drag up / down",
+    enter: () => openMetaAI() },
+  // Step 12 — NAVIGATE
+  { mod: "Phone", device: "phone", spot: "#scroll-btn", needsController: true,
+    body: "Swipe on the NAVIGATE button to move through items, and tap it to select.",
+    real: "swipe · tap", proxy: "mouse drag · click",
+    enter: () => openMetaAI() },
+  // Step 13 — BACK
+  { mod: "Phone", device: "phone", spot: "#back-btn", needsController: true,
+    body: "Tap the BACK button to go back a page.",
+    real: "tap", proxy: "mouse click",
+    enter: () => openMetaAI() },
+];
+let tourIdx = 0, tourActive = false, tourSpotSel = null;
+function tourMenu() {   // open an action card reliably, even before a live detection lands
+  if (stage === "browse") { const f = focused(); if (f) return openMenu(f); }
+  metaAI = false; selObj = "traffic light"; selImg = null;
+  query = ""; menuIdx = 0; qSub = "input"; menuLoading = true; loadingMsg = "reading the object…";
+  renderMenu(); show("menu"); loadActions();
+}
+function tourStart() { tourActive = true; tourIdx = 0; const b = document.getElementById("tour-btn"); if (b) b.style.display = "none"; document.getElementById("tour").classList.remove("hidden"); tourRender(); requestAnimationFrame(tourSpotTick); }
+function tourFinish(keep) {
+  tourActive = false; document.getElementById("tour").classList.add("hidden"); tourSpot(null);
+  try { window.parent.__tourPhoneHide(); } catch (_) {}
+  const b = document.getElementById("tour-btn"); if (b) b.style.display = "";
+  if (!keep) openMetaAI();
+}
+function tourEnd() { tourFinish(false); }
+function tourNext() { if (tourIdx >= TOUR.length - 1) return tourFinish(true); tourIdx++; tourRender(); }
+function tourPrev() { if (tourIdx > 0) { tourIdx--; tourRender(); } }
+function tourComplete(action) { if (tourActive && TOUR[tourIdx] && TOUR[tourIdx].await === action) tourNext(); }   // in-world action satisfied the step -> advance
+function tourPhoneData(s) {
+  return { mod: s.mod, body: s.body, real: s.real, proxy: s.proxy, spot: s.spot, needsController: s.needsController,
+           idx: tourIdx, total: TOUR.length, canPrev: tourIdx > 0, isLast: tourIdx === TOUR.length - 1 };
+}
+function tourRender() {
+  const s = TOUR[tourIdx], el = document.getElementById("tour");
+  if (s.enter) { try { s.enter(); } catch (_) {} }
+  if (s.device === "phone") {                        // phone step: the parent renders the card + spotlight over the phone
+    el.classList.add("hidden"); tourSpot(null);
+    try { window.parent.__tourPhoneShow(tourPhoneData(s)); } catch (_) {}
+    return;
+  }
+  try { window.parent.__tourPhoneHide(); } catch (_) {}
+  el.classList.remove("hidden");
+  const mod = el.querySelector(".tour-mod"); mod.textContent = s.mod || ""; mod.classList.toggle("hidden", !s.mod);
+  el.querySelector(".tour-count").textContent = (tourIdx + 1) + " / " + TOUR.length;
+  const title = el.querySelector(".tour-title"); title.textContent = s.title || ""; title.classList.toggle("hidden", !s.title);
+  el.querySelector(".tour-body").textContent = s.body;
+  const map = el.querySelector(".tour-map"), hasMap = !!(s.real || s.proxy);
+  map.classList.toggle("hidden", !hasMap);
+  if (hasMap) { el.querySelector(".tour-real").textContent = s.real || "—"; el.querySelector(".tour-proxy").textContent = s.proxy || "—"; }
+  el.querySelector(".tour-prev").disabled = tourIdx === 0;
+  el.querySelector(".tour-next").textContent = tourIdx === TOUR.length - 1 ? "Done ✓" : "Next ›";
+  tourSpot(s.spot);
+}
+function tourSpot(sel) { tourSpotSel = sel || null; if (!tourSpotSel) document.getElementById("tour-spot").classList.add("hidden"); }
+function tourSpotTick() {                             // keep the spotlight pinned to its target each frame (union of matched elements)
+  if (!tourActive) return;
+  const spot = document.getElementById("tour-spot");
+  if (tourSpotSel) {
+    let box = null;
+    document.querySelectorAll(tourSpotSel).forEach((elx) => {
+      const r = elx.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      box = box ? { l: Math.min(box.l, r.left), t: Math.min(box.t, r.top), r: Math.max(box.r, r.right), b: Math.max(box.b, r.bottom) }
+                : { l: r.left, t: r.top, r: r.right, b: r.bottom };
+    });
+    if (box) {
+      const vp = document.getElementById("viewport").getBoundingClientRect(), pad = 6;
+      spot.style.left = (box.l - vp.left - pad) + "px"; spot.style.top = (box.t - vp.top - pad) + "px";
+      spot.style.width = (box.r - box.l + pad * 2) + "px"; spot.style.height = (box.b - box.t + pad * 2) + "px";
+      spot.classList.remove("hidden");
+    } else spot.classList.add("hidden");
+  }
+  requestAnimationFrame(tourSpotTick);
+}
+(function wireTour() {
+  const el = document.getElementById("tour"), btn = document.getElementById("tour-btn");
+  if (btn) btn.addEventListener("click", tourStart);
+  el.querySelector(".tour-next").addEventListener("click", () => {
+    const s = TOUR[tourIdx];
+    if (s && s.await && s.do) s.do();   // do-it-for-me: perform the action; its effect advances the tour
+    else tourNext();
+  });
+  el.querySelector(".tour-prev").addEventListener("click", tourPrev);
+  el.querySelector(".tour-skip").addEventListener("click", tourEnd);
+})();
 
 init();   // start after every top-level declaration is initialized (avoids TDZ on street state)
